@@ -6,8 +6,8 @@
  * receives the phone's public key, and appends it to ~/.ssh/authorized_keys.
  * No existing SSH key needed.
  *
- * One-liner (after publishing):  npx -y mobile-acp-setup
- * From repo clone:               node server/setup.mjs
+ * One-liner:        curl -fsSL https://raw.githubusercontent.com/Rong-Tao/mobile-acp/main/server/install.sh | bash
+ * From repo clone:  node server/setup.mjs
  */
 
 import { createServer }            from 'node:http';
@@ -49,6 +49,13 @@ async function pickIP(ips) {
   if (ips.length === 1) return ips[0];
   console.log('\nMultiple interfaces detected:');
   ips.forEach((ip, i) => console.log(`  [${i + 1}] ${ip}`));
+
+  // When run via `curl | bash`, stdin is the pipe (not a TTY) — auto-pick the first IP.
+  if (!process.stdin.isTTY) {
+    console.log(`\nAuto-selected ${ips[0]} (run directly for interactive selection)`);
+    return ips[0];
+  }
+
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise(resolve => {
     rl.question('\nSelect [1]: ', answer => {

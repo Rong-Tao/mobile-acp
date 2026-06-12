@@ -1,4 +1,4 @@
-# mobile-acp
+# mobile-acp  &nbsp; [中文说明](README_CN.md)
 
 **SSH Zed for Android.** Connect to any server over SSH and run coding agents (Claude Code, Codex, Gemini CLI) from your phone — no app installed on the server, just sshd.
 
@@ -39,13 +39,15 @@
 
 ## Pairing a server
 
-On the server (needs Node ≥ 18):
+On the server (needs Node ≥ 18 and curl):
 
 ```sh
-npx -y mobile-acp-setup
+curl -fsSL https://raw.githubusercontent.com/Rong-Tao/mobile-acp/main/server/install.sh | bash
 ```
 
 This prints a QR code in the terminal. Open the app → **Add Server → Scan QR**. The app generates an Ed25519 keypair, POSTs the public key to a 5-minute local HTTP server, and tests the SSH connection — all in one tap.
+
+> **Repeat pairings:** `install.sh` caches `setup.mjs` in `~/.local/share/mobile-acp-setup/`, so subsequent runs skip the download.
 
 <p align="center">
   <img src="docs/pairing.svg" alt="Pairing flow" width="560" />
