@@ -11,6 +11,7 @@ type NativeMod = {
   killChannel(channelId: string): void;
   disconnect(sessionId: string): void;
   isConnected(sessionId: string): boolean;
+  generateKeyPair(): Promise<{ privateKey: string; publicKey: string }>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 };

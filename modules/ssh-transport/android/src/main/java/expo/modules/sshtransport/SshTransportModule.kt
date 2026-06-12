@@ -4,6 +4,7 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.JSch
+import com.jcraft.jsch.KeyPair
 import com.jcraft.jsch.Session
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -175,6 +176,26 @@ class SshTransportModule : Module() {
 
         Function("isConnected") { sessionId: String ->
             sessions[sessionId]?.isConnected ?: false
+        }
+
+        // ── generate Ed25519 keypair ───────────────────────────────
+        // Returns { privateKey: PEM string, publicKey: OpenSSH authorized_keys line }
+        AsyncFunction("generateKeyPair") {
+            val jsch = JSch()
+            val kpair = KeyPair.genKeyPair(jsch, KeyPair.ED25519)
+
+            val privOs = ByteArrayOutputStream()
+            kpair.writePrivateKey(privOs)
+
+            val pubOs = ByteArrayOutputStream()
+            kpair.writePublicKey(pubOs, "mobile-acp")
+
+            kpair.dispose()
+
+            mapOf(
+                "privateKey" to privOs.toString("UTF-8"),
+                "publicKey" to pubOs.toString("UTF-8").trim(),
+            )
         }
     }
 

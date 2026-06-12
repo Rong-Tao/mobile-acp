@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { THEME, AccentType, accentFor } from '../theme';
-import { DATA, Server, AvailableAgent } from '../data/mock';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { THEME, AccentType } from '../theme';
+import { Server } from '../data/mock';
 import { Icon } from '../components/Icon';
-import { Press, Dot, Spinner, Sheet, TopBar, Btn, Field, Seg } from '../components/Primitives';
-import { SshTransport, sshAvailable } from '../core/ssh-transport';
+import { Press, Dot, Sheet, TopBar, Btn, Field, Seg } from '../components/Primitives';
+import { NativeSsh, sshAvailable } from '../../modules/ssh-transport/src';
 import { saveCredential } from '../core/credentials';
+import { loadServers, upsertServer, removeServer } from '../core/servers';
+import { SshTransport } from '../core/ssh-transport';
 
 const T = THEME;
 
@@ -44,7 +47,7 @@ function ServerCard({ s, accent, onOpen, onMenu }: { s: Server; accent: AccentTy
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Icon name={s.auth === 'keystore' ? 'lock' : 'key'} size={13} color={T.tx2} />
           <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2 }}>
-            {s.auth === 'keystore' ? 'Keystore' : 'Key file'}
+            {s.auth === 'keystore' ? 'Keystore' : s.auth === 'key-file' ? 'Key file' : 'Password'}
           </Text>
         </View>
       </View>
@@ -56,7 +59,16 @@ function ServerCard({ s, accent, onOpen, onMenu }: { s: Server; accent: AccentTy
 type ServerListProps = { accent: AccentType; onOpen: (s: Server) => void; onAdd: () => void };
 
 export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
+  const [servers, setServers] = useState<Server[]>([]);
   const [menu, setMenu] = useState<Server | null>(null);
+
+  useEffect(() => { loadServers().then(setServers); }, []);
+
+  const handleDelete = async (s: Server) => {
+    const next = await removeServer(s.id);
+    setServers(next);
+    setMenu(null);
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg0 }}>
@@ -79,12 +91,24 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
       </SafeAreaView>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 24, gap: 11 }} showsVerticalScrollIndicator={false}>
-        <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 11.5, color: T.tx2, letterSpacing: 0.6, textTransform: 'uppercase' }}>
-          {DATA.servers.length} paired
-        </Text>
-        {DATA.servers.map(s => (
+        {servers.length > 0 && (
+          <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 11.5, color: T.tx2, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+            {servers.length} paired
+          </Text>
+        )}
+        {servers.map(s => (
           <ServerCard key={s.id} s={s} accent={accent} onOpen={onOpen} onMenu={setMenu} />
         ))}
+        {servers.length === 0 && (
+          <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+            <Icon name="server" size={40} color={T.tx2} />
+            <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 16, color: T.tx1 }}>No servers yet</Text>
+            <Text style={{ fontFamily: T.uiFont, fontSize: 13, color: T.tx2, textAlign: 'center', lineHeight: 20 }}>
+              Tap Add to pair your first server.{'\n'}Just sshd — no extra setup required.
+            </Text>
+            <Btn accent={accent} icon="plus" onPress={onAdd}>Add server</Btn>
+          </View>
+        )}
         <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2, textAlign: 'center', marginTop: 8, lineHeight: 17.6 }}>
           Zero server deploy — just <Text style={{ color: T.tx1 }}>sshd</Text>.
         </Text>
@@ -93,14 +117,8 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
       <Sheet open={!!menu} onClose={() => setMenu(null)}>
         <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
           <Text style={{ fontFamily: T.uiFont, fontSize: 13, color: T.tx2, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 12 }}>{menu?.name}</Text>
-          {([['edit', 'Edit server'], ['refresh', 'Test connection'], ['copy', 'Duplicate']] as [string, string][]).map(([ic, l]) => (
-            <Press key={l} onPress={() => setMenu(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, height: 50, paddingHorizontal: 8 }}>
-              <Icon name={ic} size={20} color={T.tx1} />
-              <Text style={{ fontFamily: T.uiFont, fontSize: 15, color: T.tx0 }}>{l}</Text>
-            </Press>
-          ))}
           <View style={{ height: 1, backgroundColor: T.borderSoft, marginVertical: 6 }} />
-          <Press onPress={() => setMenu(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, height: 50, paddingHorizontal: 8 }}>
+          <Press onPress={() => menu && handleDelete(menu)} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, height: 50, paddingHorizontal: 8 }}>
             <Icon name="trash" size={20} color={T.red} />
             <Text style={{ fontFamily: T.uiFont, fontSize: 15, color: T.red }}>Delete server</Text>
           </Press>
@@ -110,37 +128,43 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
   );
 }
 
-// ── QR Frame (decorative) ─────────────────────────────────────
-function QrFrame({ accent }: { accent: AccentType }) {
-  const cells: boolean[] = [];
-  let seed = 7;
-  for (let i = 0; i < 441; i++) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    cells.push((seed >> 16) % 100 < 48);
+// ── QR camera ─────────────────────────────────────────────────
+type QrPayload = { h: string; p: number; u: string; sp: number; t: string; e: number };
+
+function QrCamera({ onScan, accent }: { onScan: (data: string) => void; accent: AccentType }) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const scannedRef = useRef(false);
+
+  if (!permission) {
+    return (
+      <View style={{ width: 240, height: 240, borderRadius: 14, backgroundColor: T.bg2, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={accent.hue} />
+      </View>
+    );
   }
-  const finder = (r: number, c: number) => (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7);
-  const rows = Array.from({ length: 21 }, (_, r) =>
-    Array.from({ length: 21 }, (_, c) => {
-      const isFinder = finder(r, c);
-      const on = cells[r * 21 + c];
-      const lit = isFinder
-        ? ((r % 6 !== 0 && c % 6 !== 0)
-          ? (r > 1 && r < 5 && c > 1 && c < 5) || (r === 0 || r === 6 || c === 0 || c === 6)
-          : true)
-        : on;
-      return { lit, isFinder };
-    })
-  );
+
+  if (!permission.granted) {
+    return (
+      <View style={{ alignItems: 'center', gap: 14, paddingVertical: 20 }}>
+        <Icon name="qr" size={36} color={T.tx2} />
+        <Text style={{ fontFamily: T.uiFont, fontSize: 13.5, color: T.tx1, textAlign: 'center', lineHeight: 22 }}>
+          Camera access needed{'\n'}to scan the QR code
+        </Text>
+        <Btn accent={accent} onPress={requestPermission}>Allow camera</Btn>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ width: 210, height: 210, backgroundColor: '#0a0b0e', borderRadius: 14, borderWidth: 1, borderColor: T.border, padding: 16 }}>
-      {rows.map((row, r) => (
-        <View key={r} style={{ flex: 1, flexDirection: 'row' }}>
-          {row.map((cell, c) => (
-            <View key={c} style={{ flex: 1, backgroundColor: cell.lit ? (cell.isFinder ? accent.hue : T.tx0) : 'transparent', borderRadius: 0.5 }} />
-          ))}
-        </View>
-      ))}
-    </View>
+    <CameraView
+      style={{ width: 240, height: 240, borderRadius: 14, overflow: 'hidden' }}
+      barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+      onBarcodeScanned={(result: { data: string }) => {
+        if (scannedRef.current) return;
+        scannedRef.current = true;
+        onScan(result.data);
+      }}
+    />
   );
 }
 
@@ -149,29 +173,98 @@ type AddServerProps = { accent: AccentType; onBack: () => void; onPaired: (serve
 
 export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   const [mode, setMode] = useState<'qr' | 'manual'>('qr');
-  const [scanned, setScanned] = useState(false);
-  const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'password' });
+
+  // QR flow
+  const [qrPayload, setQrPayload] = useState<QrPayload | null>(null);
+  const [qrError, setQrError] = useState('');
+  const [pairing, setPairing] = useState<'idle' | 'keygen' | 'posting' | 'testing' | 'ok' | 'err'>('idle');
+  const [pairError, setPairError] = useState('');
+
+  // Manual flow
+  const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'keystore' });
   const [cred, setCred] = useState({ password: '', privateKey: '' });
   const [testing, setTesting] = useState<null | 'run' | 'ok' | 'err'>(null);
   const [testErr, setTestErr] = useState('');
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const test = async () => {
-    setTesting('run');
-    setTestErr('');
-    if (!sshAvailable) {
-      // Simulate in non-native environments
-      setTimeout(() => setTesting('ok'), 1400);
-      return;
+  const resetQr = () => { setQrPayload(null); setQrError(''); setPairing('idle'); setPairError(''); };
+
+  // ── QR pairing ───────────────────────────────────────────────
+  const handleQrScan = (raw: string) => {
+    try {
+      const p = JSON.parse(raw) as QrPayload;
+      if (!p.h || !p.u || !p.t || !p.e) throw new Error('missing fields');
+      if (Math.floor(Date.now() / 1000) > p.e) {
+        setQrError('QR code expired. Run the setup command again on your server.');
+        return;
+      }
+      setQrError('');
+      setQrPayload(p);
+    } catch {
+      setQrError('Not a mobile-acp QR code. Make sure you\'re scanning the right code.');
     }
+  };
+
+  const handlePair = async () => {
+    if (!qrPayload) return;
+    setPairing('keygen');
+    setPairError('');
+    try {
+      if (!sshAvailable || !NativeSsh) throw new Error('Native SSH module not available. Please build a native development client.');
+
+      const { privateKey, publicKey } = await NativeSsh.generateKeyPair();
+
+      setPairing('posting');
+      const res = await fetch(`http://${qrPayload.h}:${qrPayload.sp}/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${qrPayload.t}` },
+        body: JSON.stringify({ pubkey: publicKey, name: 'mobile-acp' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+
+      setPairing('testing');
+      const transport = await SshTransport.connect({
+        host: qrPayload.h, port: qrPayload.p, user: qrPayload.u,
+        auth: { type: 'key', privateKey },
+      });
+      await transport.exec('echo ok');
+      transport.close();
+
+      const server: Server = {
+        id: `srv-${Date.now()}`,
+        name: qrPayload.h,
+        host: qrPayload.h,
+        port: qrPayload.p,
+        user: qrPayload.u,
+        online: true,
+        last: 'just now',
+        auth: 'keystore',
+      };
+      await saveCredential(server.id, { type: 'key', privateKey });
+      await upsertServer(server);
+      setPairing('ok');
+      setTimeout(() => onPaired(server), 700);
+    } catch (e: any) {
+      setPairing('err');
+      setPairError(String(e?.message ?? e));
+    }
+  };
+
+  // ── Manual flow ──────────────────────────────────────────────
+  const testManual = async () => {
+    setTesting('run'); setTestErr('');
+    if (!sshAvailable) { setTimeout(() => setTesting('ok'), 1200); return; }
     try {
       const auth = form.auth === 'password'
         ? { type: 'password' as const, password: cred.password }
         : { type: 'key' as const, privateKey: cred.privateKey };
-      const transport = await SshTransport.connect({ host: form.host, port: Number(form.port), user: form.user, auth });
-      const res = await transport.exec('echo ok');
-      transport.close();
-      if (res.stdout.trim() !== 'ok') throw new Error('unexpected output: ' + res.stdout);
+      const t = await SshTransport.connect({ host: form.host, port: Number(form.port) || 22, user: form.user, auth });
+      const r = await t.exec('echo ok');
+      t.close();
+      if (r.stdout.trim() !== 'ok') throw new Error('unexpected: ' + r.stdout);
       setTesting('ok');
     } catch (e: any) {
       setTesting('err');
@@ -179,7 +272,12 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
     }
   };
 
-  const save = async () => {
+  const saveManual = async () => {
+    let privKey = cred.privateKey;
+    if (form.auth === 'keystore' && sshAvailable && NativeSsh) {
+      const kp = await NativeSsh.generateKeyPair();
+      privKey = kp.privateKey;
+    }
     const server: Server = {
       id: `srv-${Date.now()}`,
       name: form.name || form.host,
@@ -188,104 +286,122 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
       user: form.user,
       online: true,
       last: 'just now',
-      auth: form.auth as any,
+      auth: form.auth as 'keystore' | 'key-file' | 'password',
     };
-    if (form.auth !== 'keystore') {
-      const storedCred = form.auth === 'password'
-        ? { type: 'password' as const, password: cred.password }
-        : { type: 'key' as const, privateKey: cred.privateKey };
-      await saveCredential(server.id, storedCred);
-    }
+    const storedCred = form.auth === 'password'
+      ? { type: 'password' as const, password: cred.password }
+      : { type: 'key' as const, privateKey: privKey };
+    await saveCredential(server.id, storedCred);
+    await upsertServer(server);
     onPaired(server);
   };
+
+  const pairLabels: Record<string, string> = {
+    idle: 'Pair & connect', keygen: 'Generating key…', posting: 'Exchanging key…',
+    testing: 'Testing SSH…', ok: 'Connected!', err: 'Try again',
+  };
+  const busy = pairing === 'keygen' || pairing === 'posting' || pairing === 'testing' || pairing === 'ok';
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg0 }}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: T.bg1 }}>
         <TopBar title="Add server" onBack={onBack} />
       </SafeAreaView>
-      <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 0 }}>
-        <Seg accent={accent} value={mode} onChange={v => setMode(v as 'qr' | 'manual')} options={[
-          { value: 'qr', label: 'Scan QR', icon: 'qr' },
-          { value: 'manual', label: 'Manual', icon: 'edit' },
+      <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
+        <Seg accent={accent} value={mode} onChange={v => { setMode(v as 'qr' | 'manual'); resetQr(); }} options={[
+          { value: 'qr',     label: 'Scan QR', icon: 'qr'   },
+          { value: 'manual', label: 'Manual',  icon: 'edit'  },
         ]} />
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 28, gap: 12 }} showsVerticalScrollIndicator={false}>
-        {mode === 'qr' && (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingTop: 18, paddingBottom: 32, gap: 12 }} showsVerticalScrollIndicator={false}>
+
+        {/* ── QR: waiting to scan ── */}
+        {mode === 'qr' && !qrPayload && (
           <>
             <Text style={{ fontFamily: T.uiFont, fontSize: 13, color: T.tx1, textAlign: 'center', lineHeight: 20.8 }}>
-              Run this on your server, then point the camera at the code it prints.
+              Run this on your server, then point the camera at the QR code it prints.
             </Text>
             <View style={{ backgroundColor: '#0a0b0e', borderWidth: 1, borderColor: T.borderSoft, borderRadius: 11, paddingHorizontal: 13, paddingVertical: 11 }}>
               <Text style={{ fontFamily: T.monoFont, fontSize: 12, color: T.tx1 }}>
-                <Text style={{ color: accent.hue }}>$ </Text>
-                curl -fsSL https://mobile-acp.dev/setup.sh | bash
+                <Text style={{ color: accent.hue }}>$ </Text>npx -y mobile-acp-setup
               </Text>
             </View>
-            <View style={{ alignItems: 'center', marginTop: 4 }}>
-              <View>
-                <QrFrame accent={accent} />
-                {!scanned && (
-                  <View style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14,
-                    backgroundColor: 'rgba(13,14,18,0.78)', alignItems: 'center', justifyContent: 'center', gap: 10,
-                  }}>
-                    <Icon name="qr" size={30} color={accent.hue} />
-                    <Text style={{ fontFamily: T.uiFont, fontSize: 12.5, color: T.tx1 }}>Camera viewfinder</Text>
-                    <Btn size="sm" accent={accent} onPress={() => setScanned(true)}>Simulate scan</Btn>
-                  </View>
-                )}
-                {scanned && (
-                  <View style={{
-                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 14,
-                    borderWidth: 2, borderColor: T.green,
-                    shadowColor: T.green, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 8,
-                    pointerEvents: 'none',
-                  } as any} />
-                )}
+            <View style={{ alignItems: 'center', gap: 12, marginTop: 4 }}>
+              <View style={{ borderRadius: 16, overflow: 'hidden', borderWidth: 2, borderColor: T.border }}>
+                <QrCamera onScan={handleQrScan} accent={accent} />
               </View>
+              {qrError
+                ? <Text style={{ fontFamily: T.uiFont, fontSize: 12.5, color: T.red, textAlign: 'center', maxWidth: 280 }}>{qrError}</Text>
+                : <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2 }}>Code valid for 5 minutes</Text>
+              }
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {scanned && <Icon name="check" size={13} color={T.green} />}
-              <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: scanned ? T.green : T.tx2 }}>
-                {scanned ? 'Key exchange complete' : 'Code valid for 4:58'}
-              </Text>
-            </View>
-            {scanned && (
-              <View style={{ backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 13, marginTop: 2, gap: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Icon name="server" size={18} color={accent.hue} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14.5, color: T.tx0 }}>devbox-2</Text>
-                    <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2 }}>kai@10.0.0.7</Text>
-                  </View>
-                </View>
-                <Btn full accent={accent} onPress={() => onPaired(DATA.servers[0])}>Pair & open</Btn>
-              </View>
-            )}
           </>
         )}
 
+        {/* ── QR: scanned, confirm & pair ── */}
+        {mode === 'qr' && qrPayload && (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, padding: 14, backgroundColor: T.bg2, borderRadius: 13, borderWidth: 1, borderColor: T.border }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: accent.dim, borderWidth: 1, borderColor: accent.hue + '44', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="check" size={20} color={accent.hue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14.5, color: T.tx0 }}>{qrPayload.u}@{qrPayload.h}</Text>
+                <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.tx2 }}>SSH port {qrPayload.p}</Text>
+              </View>
+              {!busy && (
+                <Press onPress={resetQr} style={{ padding: 6 }}>
+                  <Icon name="x" size={16} color={T.tx2} />
+                </Press>
+              )}
+            </View>
+
+            {pairError !== '' && (
+              <View style={{ backgroundColor: T.bg2, borderRadius: 11, borderWidth: 1, borderColor: T.red + '44', padding: 12 }}>
+                <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.red }}>{pairError}</Text>
+              </View>
+            )}
+
+            <Press
+              onPress={!busy ? handlePair : undefined}
+              style={{
+                height: 52, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10,
+                backgroundColor: pairing === 'ok' ? T.green : busy ? accent.hue + 'aa' : accent.hue,
+              }}
+            >
+              {busy && pairing !== 'ok' && <ActivityIndicator size="small" color={accent.on} />}
+              {pairing === 'ok' && <Icon name="check" size={18} color="#fff" />}
+              <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15.5, color: accent.on }}>{pairLabels[pairing]}</Text>
+            </Press>
+
+            <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, textAlign: 'center', lineHeight: 19 }}>
+              A new Ed25519 key is generated on this device and added to the server's authorized_keys.
+            </Text>
+          </>
+        )}
+
+        {/* ── Manual mode ── */}
         {mode === 'manual' && (
           <>
-            <Field label="Name" value={form.name} onChange={v => set('name', v)} placeholder="my-server" accent={accent} />
-            <Field label="Host" value={form.host} onChange={v => set('host', v)} placeholder="example.com or 10.0.0.5" mono accent={accent} />
+            <Field label="Name" value={form.name} onChange={v => setF('name', v)} placeholder="my-server" accent={accent} />
+            <Field label="Host" value={form.host} onChange={v => setF('host', v)} placeholder="example.com or 10.0.0.5" mono accent={accent} />
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}><Field label="Port" value={form.port} onChange={v => set('port', v)} mono accent={accent} /></View>
-              <View style={{ flex: 2 }}><Field label="Username" value={form.user} onChange={v => set('user', v)} placeholder="root" mono accent={accent} /></View>
+              <View style={{ flex: 1 }}><Field label="Port" value={form.port} onChange={v => setF('port', v)} mono accent={accent} /></View>
+              <View style={{ flex: 2 }}><Field label="Username" value={form.user} onChange={v => setF('user', v)} placeholder="root" mono accent={accent} /></View>
             </View>
+
             <View>
               <Text style={{ fontFamily: T.uiFontMedium, fontSize: 12, color: T.tx1, marginBottom: 8 }}>Authentication</Text>
               <View style={{ gap: 8 }}>
                 {([
-                  ['keystore', 'key', 'Generate key', 'Stored in Android Keystore'],
-                  ['key-file', 'download', 'Import private key', 'From a .pem / id_ed25519 file'],
-                  ['password', 'lock', 'Password', 'Sent over the encrypted channel'],
+                  ['keystore', 'lock', 'Generate key', 'New Ed25519 key in Android Keystore'],
+                  ['key-file', 'download', 'Paste private key', 'Import a .pem / id_ed25519 file'],
+                  ['password', 'key', 'Password', 'Sent over the encrypted channel'],
                 ] as [string, string, string, string][]).map(([val, ic, l, d]) => {
                   const on = form.auth === val;
                   return (
-                    <Press key={val} onPress={() => set('auth', val)} style={{
+                    <Press key={val} onPress={() => setF('auth', val)} style={{
                       flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 11,
                       backgroundColor: on ? accent.dim : T.bg2, borderWidth: 1, borderColor: on ? accent.hue + '66' : T.border,
                     }}>
@@ -293,9 +409,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                           <Text style={{ fontFamily: T.uiFontMedium, fontSize: 14, color: T.tx0 }}>{l}</Text>
-                          {val === 'keystore' && (
-                            <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 10.5, color: accent.hue }}>RECOMMENDED</Text>
-                          )}
+                          {val === 'keystore' && <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 10.5, color: accent.hue }}>RECOMMENDED</Text>}
                         </View>
                         <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2, marginTop: 1 }}>{d}</Text>
                       </View>
@@ -307,7 +421,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                 })}
               </View>
             </View>
-            {/* Credential input */}
+
             {form.auth === 'password' && (
               <Field label="Password" value={cred.password} onChange={v => setCred(c => ({ ...c, password: v }))}
                 placeholder="SSH password" secure accent={accent} />
@@ -318,9 +432,10 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                 <TextInput
                   value={cred.privateKey}
                   onChangeText={v => setCred(c => ({ ...c, privateKey: v }))}
-                  placeholder={'-----BEGIN OPENSSH PRIVATE KEY-----\n...'}
+                  placeholder={'-----BEGIN OPENSSH PRIVATE KEY-----\n…'}
                   placeholderTextColor={T.tx2}
-                  multiline numberOfLines={6}
+                  multiline
+                  numberOfLines={6}
                   style={{
                     backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 11,
                     fontFamily: T.monoFont, fontSize: 11.5, color: T.tx0, padding: 12,
@@ -329,19 +444,38 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                 />
               </View>
             )}
+            {form.auth === 'keystore' && (
+              <View style={{ backgroundColor: T.bg2, borderRadius: 11, borderWidth: 1, borderColor: T.borderSoft, padding: 12 }}>
+                <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, lineHeight: 19 }}>
+                  A new Ed25519 key pair will be generated. Add the public key to{' '}
+                  <Text style={{ fontFamily: T.monoFont, color: T.tx1 }}>~/.ssh/authorized_keys</Text> on the server,{' '}
+                  or use the QR scan flow for automatic setup.
+                </Text>
+              </View>
+            )}
+
             {testErr !== '' && (
               <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.red }}>{testErr}</Text>
             )}
-            <Btn kind="ghost" full icon={testing === 'ok' ? 'check' : 'refresh'} onPress={test}
-              style={testing === 'ok' ? { borderColor: T.green + '55' } : testing === 'err' ? { borderColor: T.red + '55' } : {}}>
-              {testing === 'run'
-                ? <Spinner size={14} color={T.tx1} />
-                : <Text style={{ fontFamily: T.uiFontMedium, fontSize: 14.5, color: testing === 'ok' ? T.green : testing === 'err' ? T.red : T.tx1 }}>
-                    {testing === 'ok' ? 'Connection OK' : testing === 'err' ? 'Connection failed' : 'Test connection'}
-                  </Text>
-              }
+
+            {form.auth !== 'keystore' && (
+              <Btn
+                kind="ghost" full
+                icon={testing === 'run' ? undefined : testing === 'ok' ? 'check' : 'refresh'}
+                onPress={testing === 'run' ? undefined : testManual}
+                style={testing === 'ok' ? { borderColor: T.green + '55' } : testing === 'err' ? { borderColor: T.red + '55' } : {}}
+              >
+                {testing === 'run' ? 'Testing…' : testing === 'ok' ? 'Connection OK' : testing === 'err' ? 'Connection failed' : 'Test connection'}
+              </Btn>
+            )}
+
+            <Btn
+              full accent={accent}
+              disabled={!form.host.trim() || !form.user.trim() || (form.auth !== 'keystore' && testing !== 'ok')}
+              onPress={saveManual}
+            >
+              Save & open
             </Btn>
-            <Btn full accent={accent} disabled={testing !== 'ok'} onPress={save}>Save & open</Btn>
           </>
         )}
       </ScrollView>
