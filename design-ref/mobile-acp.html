@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>mobile-acp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #1a1b1e; overscroll-behavior: none; }
+  #root { height: 100%; }
+  input, textarea { font-family: inherit; }
+  input::placeholder, textarea::placeholder { color: #6c7382; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  * { scrollbar-width: none; }
+  @keyframes acp-spin { to { transform: rotate(360deg); } }
+  @keyframes acp-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes acp-slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes acp-blink { 50% { opacity: 0; } }
+  @keyframes acp-fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes acp-slidein { from { transform: translateX(20px); } to { transform: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#14161b" />
+    <rect x="34" y="22" width="32" height="56" rx="6" fill="#0d0e12" stroke="#6aa6ff" stroke-width="2" />
+    <path d="M42 44l5 5-5 5M52 56h6" stroke="#6aa6ff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+</template>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="theme.jsx"></script>
+<script type="text/babel" src="code.jsx"></script>
+<script type="text/babel" src="ui.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="android-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="screens-home.jsx"></script>
+<script type="text/babel" src="screens-server.jsx"></script>
+<script type="text/babel" src="tabs-agent.jsx"></script>
+<script type="text/babel" src="tabs-other.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
