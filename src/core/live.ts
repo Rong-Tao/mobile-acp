@@ -79,6 +79,10 @@ export class LiveSession {
     }
   }
 
+  async exec(cmd: string, cwd?: string): Promise<{ stdout: string; stderr: string; code: number }> {
+    return this.opts.transport.exec(cmd, cwd ? { cwd } : undefined);
+  }
+
   async cancel(): Promise<void> {
     // 协议要求：取消时待决的 permission 必须以 cancelled outcome 回复
     this.store.getState().pendingPermission?.cancel();

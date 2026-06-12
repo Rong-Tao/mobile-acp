@@ -1,0 +1,21 @@
+{
+  "name": "mobile-acp-setup",
+  "version": "1.0.0",
+  "description": "Setup helper for mobile-acp — shows a QR code to pair your phone via SSH key exchange",
+  "type": "module",
+  "bin": {
+    "mobile-acp-setup": "./setup.mjs"
+  },
+  "main": "./setup.mjs",
+  "scripts": {
+    "start": "node setup.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "keywords": ["mobile-acp", "ssh", "qr", "pairing"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

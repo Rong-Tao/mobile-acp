@@ -18,9 +18,7 @@ const T = THEME;
 type TabId = 'agent' | 'files' | 'git';
 
 // ── Top Tab Bar ───────────────────────────────────────────────
-function TopTabs({ tab, setTab, accent, onBack }: { tab: TabId; setTab: (t: TabId) => void; accent: AccentType; onBack: () => void }) {
-  const g = DATA.git;
-  const gitCount = g.unstaged.length + g.staged.length + g.untracked.length;
+function TopTabs({ tab, setTab, accent, onBack, gitCount = 0 }: { tab: TabId; setTab: (t: TabId) => void; accent: AccentType; onBack: () => void; gitCount?: number }) {
 
   const TABS: { id: TabId; label: string; icon: string }[] = [
     { id: 'agent', label: 'Agent', icon: 'cmd' },
@@ -58,8 +56,7 @@ function TopTabs({ tab, setTab, accent, onBack }: { tab: TabId; setTab: (t: TabI
 // ── Context Header ────────────────────────────────────────────
 function ContextHeader({ tab, accent, conn, onReconnect, curAgent, curThread, onThreadTap, onAction, serverName, projectName }:
   { tab: TabId; accent: AccentType; conn: string; onReconnect: () => void; curAgent: { icon: string; tint: string; name: string }; curThread?: Thread; onThreadTap: () => void; onAction: () => void; serverName: string; projectName: string }) {
-  const g = DATA.git;
-  const gitCount = g.unstaged.length + g.staged.length + g.untracked.length;
+  const gitCount = 0;
 
   const avatar = tab === 'agent'
     ? { icon: curAgent.icon, tint: curAgent.tint }
@@ -67,7 +64,7 @@ function ContextHeader({ tab, accent, conn, onReconnect, curAgent, curThread, on
 
   const title = tab === 'agent'
     ? (curThread ? curThread.title : 'New thread')
-    : tab === 'files' ? projectName : g.branch;
+    : tab === 'files' ? projectName : 'main';
 
   const sub = tab === 'agent'
     ? `${projectName} · ${curAgent.name}`
@@ -223,8 +220,8 @@ function MainShellInner({ server, project, accent, onBack }: MainShellProps) {
             <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2 }}>Connecting to agent…</Text>
           </View>
         )}
-        {tab === 'files' && <FilesTab accent={accent} />}
-        {tab === 'git' && <GitTab accent={accent} />}
+        {tab === 'files' && <FilesTab accent={accent} exec={live.session ? (cmd, cwd) => live.session!.exec(cmd, cwd) : undefined} cwd={project.path} />}
+        {tab === 'git'   && <GitTab   accent={accent} exec={live.session ? (cmd, cwd) => live.session!.exec(cmd, cwd) : undefined} cwd={project.path} />}
       </View>
 
       {/* thread switcher */}
