@@ -24,7 +24,7 @@
     "expo-font": "~13.0.0",
     "expo-secure-store": "~14.0.1",
     "expo-ssh-transport": "file:./modules/ssh-transport",
-    "expo-splash-screen": "^56.0.10",
+    "expo-splash-screen": "~0.29.24",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

@@ -1,4 +1,6 @@
-# mobile-acp  &nbsp; [中文说明](README_CN.md)
+# mobile-acp
+
+[**中文说明 →**](README_CN.md)
 
 **SSH Zed for Android.** Connect to any server over SSH and run coding agents (Claude Code, Codex, Gemini CLI) from your phone — no app installed on the server, just sshd.
 

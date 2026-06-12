@@ -37,6 +37,23 @@ jobs:
             "build-tools;35.0.0" \
             "ndk;26.1.10909125"
 
+      - name: Patch ExpoModulesCorePlugin for AGP 8.6+
+        run: |
+          python3 - << 'EOF'
+          path = 'node_modules/expo-modules-core/android/ExpoModulesCorePlugin.gradle'
+          with open(path) as f:
+              content = f.read()
+          # AGP 8.6 resolves components lazily; 'components.release' in afterEvaluate
+          # throws "Could not get unknown property 'release'". Guard with findByName.
+          patched = content.replace(
+              '          from components.release',
+              '          def rc = project.components.findByName("release"); if (rc != null) from rc'
+          )
+          with open(path, 'w') as f:
+              f.write(patched)
+          print('patched' if patched != content else 'no change needed')
+          EOF
+
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
