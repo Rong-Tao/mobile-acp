@@ -19,7 +19,8 @@ export function bridgeUrl(): string {
   if (typeof location !== 'undefined' && location.hostname) {
     const q = new URLSearchParams(location.search).get('bridge');
     if (q) return q;
-    return `ws://${location.hostname}:8790`;
+    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${scheme}://${location.hostname}:8790`;
   }
   return 'ws://localhost:8790';
 }
