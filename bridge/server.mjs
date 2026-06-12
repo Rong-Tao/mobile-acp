@@ -21,6 +21,14 @@
 import { WebSocketServer } from 'ws';
 import { spawn, exec } from 'node:child_process';
 
+const HOME = process.env.HOME || '/root';
+const expandCwd = (p) => {
+  if (!p) return HOME;
+  if (p === '~') return HOME;
+  if (p.startsWith('~/')) return HOME + p.slice(1);
+  return p;
+};
+
 const args = process.argv.slice(2);
 const argOf = (name, dflt) => {
   const i = args.indexOf(name);
@@ -59,7 +67,7 @@ wss.on('connection', (ws, req) => {
       try {
         const p = spawn(m.cmd, {
           shell: true,
-          cwd: m.cwd || process.env.HOME,
+          cwd: expandCwd(m.cwd),
           env: { ...process.env, ...(m.env || {}) },
           stdio: ['pipe', 'pipe', 'pipe'],
         });
@@ -81,7 +89,7 @@ wss.on('connection', (ws, req) => {
     } else if (m.op === 'kill') {
       procs.get(m.ch)?.kill('SIGTERM');
     } else if (m.op === 'exec') {
-      exec(m.cmd, { cwd: m.cwd || process.env.HOME, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
+      exec(m.cmd, { cwd: expandCwd(m.cwd), maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
         send({ op: 'exec-result', id: m.id, stdout, stderr, code: err ? (err.code ?? 1) : 0 });
       });
     }

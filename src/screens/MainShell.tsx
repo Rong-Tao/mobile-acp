@@ -6,8 +6,10 @@ import { DATA, Server, Project, Thread } from '../data/mock';
 import { Icon } from '../components/Icon';
 import { Press, Dot, Spinner, Sheet, EmptyHint } from '../components/Primitives';
 import { AgentTab } from '../tabs/AgentTab';
+import { LiveAgentTab } from '../tabs/LiveAgentTab';
 import { FilesTab } from '../tabs/FilesTab';
 import { GitTab } from '../tabs/GitTab';
+import { LiveProvider, useLive } from '../core/live-context';
 
 const T = THEME;
 
@@ -136,7 +138,19 @@ function ThreadRow({ t, active, accent, onSelect }: { t: Thread; active: boolean
 // ── Main Shell ────────────────────────────────────────────────
 type MainShellProps = { server: Server; project: Project; accent: AccentType; onBack: () => void };
 
-export function MainShell({ server, project, accent, onBack }: MainShellProps) {
+const LIVE_AGENT_CMD = 'npx -y @agentclientprotocol/claude-agent-acp';
+
+export function MainShell(props: MainShellProps) {
+  // 进入主界面时尝试连 dev bridge；失败则 UI 回退到 mock 原型行为
+  return (
+    <LiveProvider cwd={props.project.path} agentCmd={LIVE_AGENT_CMD}>
+      <MainShellInner {...props} />
+    </LiveProvider>
+  );
+}
+
+function MainShellInner({ server, project, accent, onBack }: MainShellProps) {
+  const live = useLive();
   const [tab, setTabRaw] = useState<TabId>('agent');
   const [activeThread, setActiveThread] = useState('t1');
   const [activeAgent, setActiveAgent] = useState('claude');
@@ -178,7 +192,15 @@ export function MainShell({ server, project, accent, onBack }: MainShellProps) {
 
       <View style={{ flex: 1 }}>
         {tab === 'agent' && (
-          <AgentTab accent={accent} tweaks={tweaks} activeThread={activeThread} agentId={activeAgent} />
+          live.session
+            ? <LiveAgentTab session={live.session} accent={accent} />
+            : <AgentTab accent={accent} tweaks={tweaks} activeThread={activeThread} agentId={activeAgent} />
+        )}
+        {tab === 'agent' && live.status === 'connecting' && (
+          <View style={{ position: 'absolute', top: 8, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border }}>
+            <Spinner size={12} color={accent.hue} />
+            <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2 }}>Connecting to agent…</Text>
+          </View>
         )}
         {tab === 'files' && <FilesTab accent={accent} />}
         {tab === 'git' && <GitTab accent={accent} />}

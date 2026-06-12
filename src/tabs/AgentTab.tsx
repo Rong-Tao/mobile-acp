@@ -34,7 +34,7 @@ const cfgChip = (k: CfgKey, v: string) => CFG[k].opts.find(o => o.v === v)?.chip
 const TOOL_ICON: Record<string, string> = { read: 'file', grep: 'search', write: 'edit', execute: 'terminal' };
 
 // ── Inline Markdown ───────────────────────────────────────────
-function InlineMd({ text, fontSize = 14 }: { text: string; fontSize?: number }) {
+export function InlineMd({ text, fontSize = 14 }: { text: string; fontSize?: number }) {
   const parts = String(text).split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return (
     <Text style={{ fontFamily: T.uiFont, fontSize, lineHeight: fontSize * 1.6, color: T.tx0 }}>
@@ -48,7 +48,7 @@ function InlineMd({ text, fontSize = 14 }: { text: string; fontSize?: number }) 
 }
 
 // ── Tool Card ─────────────────────────────────────────────────
-function ToolCard({ m, accent, compact, lineNumbers }: { m: Message; accent: AccentType; compact: boolean; lineNumbers: boolean }) {
+export function ToolCard({ m, accent, compact, lineNumbers }: { m: Message; accent: AccentType; compact: boolean; lineNumbers: boolean }) {
   const [open, setOpen] = useState(false);
   const tint = m.tool === 'write' ? T.green : accent.hue;
   return (
@@ -149,7 +149,7 @@ function PermissionCard({ m, accent, onResolve, resolved }: { m: Message; accent
 }
 
 // ── Bubble ────────────────────────────────────────────────────
-function Bubble({ m, accent, fontSize }: { m: Message; accent: AccentType; fontSize: number }) {
+export function Bubble({ m, accent, fontSize }: { m: Message; accent: AccentType; fontSize: number }) {
   if (m.role === 'user') {
     return (
       <View style={{
