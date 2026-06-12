@@ -5,6 +5,8 @@ import { THEME, AccentType, accentFor } from '../theme';
 import { DATA, Server, AvailableAgent } from '../data/mock';
 import { Icon } from '../components/Icon';
 import { Press, Dot, Spinner, Sheet, TopBar, Btn, Field, Seg } from '../components/Primitives';
+import { SshTransport, sshAvailable } from '../core/ssh-transport';
+import { saveCredential } from '../core/credentials';
 
 const T = THEME;
 
@@ -143,18 +145,58 @@ function QrFrame({ accent }: { accent: AccentType }) {
 }
 
 // ── Add Server ────────────────────────────────────────────────
-type AddServerProps = { accent: AccentType; onBack: () => void; onPaired: () => void };
+type AddServerProps = { accent: AccentType; onBack: () => void; onPaired: (server: Server) => void };
 
 export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   const [mode, setMode] = useState<'qr' | 'manual'>('qr');
   const [scanned, setScanned] = useState(false);
-  const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'keystore' });
-  const [testing, setTesting] = useState<null | 'run' | 'ok'>(null);
+  const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'password' });
+  const [cred, setCred] = useState({ password: '', privateKey: '' });
+  const [testing, setTesting] = useState<null | 'run' | 'ok' | 'err'>(null);
+  const [testErr, setTestErr] = useState('');
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const test = () => {
+  const test = async () => {
     setTesting('run');
-    setTimeout(() => setTesting('ok'), 1400);
+    setTestErr('');
+    if (!sshAvailable) {
+      // Simulate in non-native environments
+      setTimeout(() => setTesting('ok'), 1400);
+      return;
+    }
+    try {
+      const auth = form.auth === 'password'
+        ? { type: 'password' as const, password: cred.password }
+        : { type: 'key' as const, privateKey: cred.privateKey };
+      const transport = await SshTransport.connect({ host: form.host, port: Number(form.port), user: form.user, auth });
+      const res = await transport.exec('echo ok');
+      transport.close();
+      if (res.stdout.trim() !== 'ok') throw new Error('unexpected output: ' + res.stdout);
+      setTesting('ok');
+    } catch (e: any) {
+      setTesting('err');
+      setTestErr(String(e?.message ?? e));
+    }
+  };
+
+  const save = async () => {
+    const server: Server = {
+      id: `srv-${Date.now()}`,
+      name: form.name || form.host,
+      host: form.host,
+      port: Number(form.port) || 22,
+      user: form.user,
+      online: true,
+      last: 'just now',
+      auth: form.auth as any,
+    };
+    if (form.auth !== 'keystore') {
+      const storedCred = form.auth === 'password'
+        ? { type: 'password' as const, password: cred.password }
+        : { type: 'key' as const, privateKey: cred.privateKey };
+      await saveCredential(server.id, storedCred);
+    }
+    onPaired(server);
   };
 
   return (
@@ -219,7 +261,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                     <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2 }}>kai@10.0.0.7</Text>
                   </View>
                 </View>
-                <Btn full accent={accent} onPress={onPaired}>Pair & open</Btn>
+                <Btn full accent={accent} onPress={() => onPaired(DATA.servers[0])}>Pair & open</Btn>
               </View>
             )}
           </>
@@ -265,16 +307,41 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                 })}
               </View>
             </View>
+            {/* Credential input */}
+            {form.auth === 'password' && (
+              <Field label="Password" value={cred.password} onChange={v => setCred(c => ({ ...c, password: v }))}
+                placeholder="SSH password" secure accent={accent} />
+            )}
+            {form.auth === 'key-file' && (
+              <View>
+                <Text style={{ fontFamily: T.uiFontMedium, fontSize: 12, color: T.tx1, marginBottom: 8 }}>Private key (PEM)</Text>
+                <TextInput
+                  value={cred.privateKey}
+                  onChangeText={v => setCred(c => ({ ...c, privateKey: v }))}
+                  placeholder={'-----BEGIN OPENSSH PRIVATE KEY-----\n...'}
+                  placeholderTextColor={T.tx2}
+                  multiline numberOfLines={6}
+                  style={{
+                    backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 11,
+                    fontFamily: T.monoFont, fontSize: 11.5, color: T.tx0, padding: 12,
+                    textAlignVertical: 'top', minHeight: 100,
+                  }}
+                />
+              </View>
+            )}
+            {testErr !== '' && (
+              <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.red }}>{testErr}</Text>
+            )}
             <Btn kind="ghost" full icon={testing === 'ok' ? 'check' : 'refresh'} onPress={test}
-              style={testing === 'ok' ? { borderColor: T.green + '55' } : {}}>
+              style={testing === 'ok' ? { borderColor: T.green + '55' } : testing === 'err' ? { borderColor: T.red + '55' } : {}}>
               {testing === 'run'
                 ? <Spinner size={14} color={T.tx1} />
-                : <Text style={{ fontFamily: T.uiFontMedium, fontSize: 14.5, color: testing === 'ok' ? T.green : T.tx1 }}>
-                    {testing === 'ok' ? 'Connection OK · 42ms' : 'Test connection'}
+                : <Text style={{ fontFamily: T.uiFontMedium, fontSize: 14.5, color: testing === 'ok' ? T.green : testing === 'err' ? T.red : T.tx1 }}>
+                    {testing === 'ok' ? 'Connection OK' : testing === 'err' ? 'Connection failed' : 'Test connection'}
                   </Text>
               }
             </Btn>
-            <Btn full accent={accent} disabled={testing !== 'ok'} onPress={onPaired}>Save & open</Btn>
+            <Btn full accent={accent} disabled={testing !== 'ok'} onPress={save}>Save & open</Btn>
           </>
         )}
       </ScrollView>

@@ -9,7 +9,9 @@ import { AgentTab } from '../tabs/AgentTab';
 import { LiveAgentTab } from '../tabs/LiveAgentTab';
 import { FilesTab } from '../tabs/FilesTab';
 import { GitTab } from '../tabs/GitTab';
-import { LiveProvider, useLive } from '../core/live-context';
+import { LiveProvider, SshLiveProvider, useLive } from '../core/live-context';
+import { loadCredential } from '../core/credentials';
+import type { SshConfig } from '../core/ssh-transport';
 
 const T = THEME;
 
@@ -141,7 +143,26 @@ type MainShellProps = { server: Server; project: Project; accent: AccentType; on
 const LIVE_AGENT_CMD = 'npx -y @agentclientprotocol/claude-agent-acp';
 
 export function MainShell(props: MainShellProps) {
-  // 进入主界面时尝试连 dev bridge；失败则 UI 回退到 mock 原型行为
+  const [ssh, setSsh] = React.useState<SshConfig | null | 'loading'>('loading');
+
+  React.useEffect(() => {
+    loadCredential(props.server.id).then((cred) => {
+      if (!cred) { setSsh(null); return; }
+      setSsh({ host: props.server.host, port: props.server.port, user: props.server.user, auth: cred });
+    });
+  }, [props.server.id]);
+
+  if (ssh === 'loading') return null;
+
+  if (ssh) {
+    return (
+      <SshLiveProvider ssh={ssh} cwd={props.project.path} agentCmd={LIVE_AGENT_CMD}>
+        <MainShellInner {...props} />
+      </SshLiveProvider>
+    );
+  }
+
+  // 没有存储的 SSH 凭证时，回退到 dev bridge（WS）
   return (
     <LiveProvider cwd={props.project.path} agentCmd={LIVE_AGENT_CMD}>
       <MainShellInner {...props} />
