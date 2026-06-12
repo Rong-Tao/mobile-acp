@@ -197,14 +197,14 @@ class SshTransportModule : Module() {
                 "publicKey" to pubOs.toString("UTF-8").trim(),
             )
         }
-    }
 
-    override fun onDestroy() {
-        scope.cancel()
-        spawns.values.forEach { try { it.channel.disconnect() } catch (_: Exception) {} }
-        sessions.values.forEach { try { it.disconnect() } catch (_: Exception) {} }
-        spawns.clear()
-        sessions.clear()
+        OnDestroy {
+            scope.cancel()
+            spawns.values.forEach { try { it.channel.disconnect() } catch (_: Exception) {} }
+            sessions.values.forEach { try { it.disconnect() } catch (_: Exception) {} }
+            spawns.clear()
+            sessions.clear()
+        }
     }
 
     // shell-quote a single path component
