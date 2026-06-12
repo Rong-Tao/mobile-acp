@@ -1,0 +1,10 @@
+{
+  "name": "expo-ssh-transport",
+  "version": "1.0.0",
+  "description": "SSH transport native module for mobile-acp",
+  "main": "src/index.ts",
+  "files": ["android", "src", "expo-module.config.json"],
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

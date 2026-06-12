@@ -213,10 +213,11 @@ type FieldProps = {
   type?: string;
   right?: ReactNode;
   readOnly?: boolean;
+  secure?: boolean;
   accent?: AccentType;
 };
 
-export function Field({ label, value, onChange, placeholder, mono, hint, right, readOnly, accent }: FieldProps) {
+export function Field({ label, value, onChange, placeholder, mono, hint, right, readOnly, secure, accent }: FieldProps) {
   const [focused, setFocused] = React.useState(false);
   const a = accent || accentFor('blue');
   return (
@@ -232,6 +233,7 @@ export function Field({ label, value, onChange, placeholder, mono, hint, right, 
           placeholderTextColor={T.tx2}
           onChangeText={onChange}
           editable={!readOnly}
+          secureTextEntry={secure}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{ flex: 1, color: T.tx0, fontSize: 14.5, fontFamily: mono ? T.monoFont : T.uiFont, padding: 0 }}

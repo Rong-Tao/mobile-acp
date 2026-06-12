@@ -72,7 +72,7 @@ export default function App() {
           <AddServer
             accent={accent}
             onBack={() => go({ screen: 'home' })}
-            onPaired={() => go({ screen: 'detail', server: DATA.servers[0] })}
+            onPaired={(server) => go({ screen: 'detail', server })}
           />
         )}
         {nav.screen === 'detail' && (

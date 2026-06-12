@@ -4,8 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "vitest run",
     "bridge": "node bridge/server.mjs"
@@ -20,6 +20,8 @@
     "expo": "~52.0.0",
     "expo-asset": "~11.0.5",
     "expo-font": "~13.0.0",
+    "expo-secure-store": "~14.0.1",
+    "expo-ssh-transport": "file:./modules/ssh-transport",
     "expo-splash-screen": "^56.0.10",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
