@@ -58,20 +58,20 @@ Zed 参照：`docs/zed-acp-notes.md`（Zed ACP 实现调研笔记）。
 ## 阶段
 
 ### Phase 1 — ACP 核心层 + dev bridge（本机可验证）
-- [ ] `src/core/acp/connection.ts`：newline-delimited JSON-RPC，
+- [x] `src/core/acp/agent-client.ts`：newline-delimited JSON-RPC，
       client→agent 方法封装，agent→client 请求分发（permission/fs/terminal）
-- [ ] `src/core/acp/session.ts`：update 流 → entry 列表 reducer
+- [x] `src/core/acp/session-store.ts`：update 流 → entry 列表 reducer
       （chunk 追加、tool_call upsert、plan 整体替换、thought 流）
-- [ ] `bridge/server.mjs`：WS ↔ 子进程多路复用（spawn/stdin/stdout/exit/exec）
-- [ ] `src/core/ws-transport.ts`
-- [ ] Node 端 e2e 测试：bridge + 真 claude-agent-acp，
+- [x] `bridge/server.mjs`：WS ↔ 子进程多路复用（spawn/stdin/stdout/exit/exec）
+- [x] `src/core/ws-transport.ts`
+- [x] Node 端 e2e 测试：bridge + 真 claude-agent-acp，
       initialize → session/new → prompt → 校验 update 流和权限流
 
 ### Phase 2 — UI 接线
-- [ ] AgentTab：mock 换 session store（流式文本、工具卡片状态机、
+- [x] AgentTab：mock 换 session store（流式文本、工具卡片状态机、
       动态权限卡片、plan/thought 卡片）
-- [ ] 连接管理：服务器配置 → transport 建立 → agent spawn 生命周期
-- [ ] modes / configOptions chips 走协议
+- [x] 连接管理（LiveProvider，连不上自动回退 mock）：服务器配置 → transport 建立 → agent spawn 生命周期
+- [x] modes chip 走协议（configOptions 待做）
 - [ ] GitTab / FilesTab 接 `exec()` 真数据
 
 ### Phase 3 — SSH 原生传输
@@ -95,4 +95,5 @@ Zed 参照：`docs/zed-acp-notes.md`（Zed ACP 实现调研笔记）。
 
 - ✅ UI 原型（设计稿 1:1 移植，全 mock）
 - ✅ Zed ACP 架构调研
-- ▶ Phase 1 进行中
+- ✅ Phase 1 完成（e2e 7 tests 绿）
+- ▶ Phase 2 大部分完成：AgentTab 全链路真协议（流式文本/thought/工具卡片/动态权限/mode 切换，headless 浏览器验证）；GitTab/FilesTab 仍 mock

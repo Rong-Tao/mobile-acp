@@ -43,7 +43,7 @@ export const DATA = {
   ] as AvailableAgent[],
 
   projects: [
-    { id: 'p1', name: 'mobile-acp', path: '~/code/mobile-acp', branch: 'feat/git-panel', dirty: 4 },
+    { id: 'p1', name: 'mobile-acp', path: '~/mobile-acp', branch: 'feat/git-panel', dirty: 4 },
     { id: 'p2', name: 'acp-server', path: '~/code/acp-server', branch: 'main', dirty: 0 },
     { id: 'p3', name: 'dotfiles', path: '~/.config', branch: 'main', dirty: 1 },
   ] as Project[],
