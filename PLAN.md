@@ -5,7 +5,7 @@
 > agent panel 体验对齐 Zed，配套 Git / Files 面板。服务端零部署，只需 sshd。
 
 设计稿：`design-ref/`（claude.ai design artifact 原件）。
-产品需求：`../mobile-acp-prd.md`（home 目录，后续合入 repo）。
+产品需求：`docs/prd.md`。
 Zed 参照：`docs/zed-acp-notes.md`（Zed ACP 实现调研笔记）。
 
 ## 架构
