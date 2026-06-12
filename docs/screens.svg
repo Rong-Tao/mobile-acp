@@ -1,0 +1,257 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="'SF Pro Display','Inter',system-ui,sans-serif">
+  <defs>
+    <clipPath id="phone1"><rect x="32" y="28" width="242" height="464" rx="28"/></clipPath>
+    <clipPath id="phone2"><rect x="329" y="28" width="242" height="464" rx="28"/></clipPath>
+    <clipPath id="phone3"><rect x="626" y="28" width="242" height="464" rx="28"/></clipPath>
+    <filter id="glow-blue"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000" flood-opacity="0.55"/></filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="900" height="520" fill="#09090c"/>
+
+  <!-- ══════════════════════ PHONE 1 — Server List ══════════════════════ -->
+  <g filter="url(#shadow)">
+    <rect x="32" y="28" width="242" height="464" rx="28" fill="#14161b" stroke="#272b34" stroke-width="1.5"/>
+  </g>
+  <!-- notch -->
+  <rect x="115" y="36" width="76" height="18" rx="9" fill="#0d0e12"/>
+
+  <g clip-path="url(#phone1)">
+    <!-- status bar -->
+    <rect x="32" y="28" width="242" height="56" fill="#14161b"/>
+    <text x="52" y="62" fill="#6c7382" font-size="9" letter-spacing="1.4" font-weight="600">MOBILE·ACP</text>
+    <text x="52" y="78" fill="#e7e9ee" font-size="17" font-weight="700" letter-spacing="-0.4">Servers</text>
+    <!-- Add button -->
+    <rect x="224" y="58" width="40" height="26" rx="8" fill="#6aa6ff"/>
+    <text x="244" y="75" fill="#0a1220" font-size="18" text-anchor="middle" font-weight="600">+</text>
+
+    <!-- separator -->
+    <rect x="32" y="88" width="242" height="1" fill="#1d2129"/>
+
+    <!-- label -->
+    <text x="52" y="112" fill="#6c7382" font-size="9.5" letter-spacing="0.7" font-weight="600">2 PAIRED</text>
+
+    <!-- server card 1 -->
+    <rect x="44" y="122" width="218" height="68" rx="12" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <!-- icon -->
+    <rect x="57" y="133" width="30" height="30" rx="8" fill="#22262f" stroke="#272b34" stroke-width="1"/>
+    <rect x="64" y="143" width="16" height="10" rx="1.5" fill="none" stroke="#6aa6ff" stroke-width="1.5"/>
+    <rect x="67" y="153" width="4" height="3" rx=".5" fill="#6aa6ff"/>
+    <rect x="73" y="153" width="4" height="3" rx=".5" fill="#6aa6ff"/>
+    <!-- name -->
+    <text x="95" y="146" fill="#e7e9ee" font-size="12.5" font-weight="600">devbox</text>
+    <!-- green dot -->
+    <circle cx="145" cy="143" r="4" fill="#6cd093"/>
+    <circle cx="145" cy="143" r="6" fill="#6cd093" opacity=".18"/>
+    <text x="95" y="161" fill="#6c7382" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">kai@dev.tail9c2f.ts.net</text>
+    <!-- bottom row -->
+    <text x="57" y="181" fill="#6cd093" font-size="9.5">Online</text>
+    <text x="90" y="181" fill="#272b34" font-size="9.5">·</text>
+    <text x="98" y="181" fill="#6c7382" font-size="9.5">2m ago</text>
+    <text x="212" y="181" fill="#6c7382" font-size="9" text-anchor="end">🔒 Keystore</text>
+
+    <!-- server card 2 -->
+    <rect x="44" y="200" width="218" height="68" rx="12" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <rect x="57" y="211" width="30" height="30" rx="8" fill="#22262f" stroke="#272b34" stroke-width="1"/>
+    <rect x="64" y="221" width="16" height="10" rx="1.5" fill="none" stroke="#6aa6ff" stroke-width="1.5"/>
+    <rect x="67" y="231" width="4" height="3" rx=".5" fill="#6aa6ff"/>
+    <rect x="73" y="231" width="4" height="3" rx=".5" fill="#6aa6ff"/>
+    <text x="95" y="224" fill="#e7e9ee" font-size="12.5" font-weight="600">gpu-rig</text>
+    <circle cx="143" cy="221" r="4" fill="#6cd093"/>
+    <circle cx="143" cy="221" r="6" fill="#6cd093" opacity=".18"/>
+    <text x="95" y="239" fill="#6c7382" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">root@192.168.1.42</text>
+    <text x="57" y="259" fill="#6cd093" font-size="9.5">Online</text>
+    <text x="90" y="259" fill="#272b34" font-size="9.5">·</text>
+    <text x="98" y="259" fill="#6c7382" font-size="9.5">1h ago</text>
+    <text x="212" y="259" fill="#6c7382" font-size="9" text-anchor="end">🔒 Keystore</text>
+
+    <!-- footer -->
+    <text x="153" y="468" fill="#6c7382" font-size="10" text-anchor="middle">Zero server deploy — just sshd.</text>
+  </g>
+
+  <!-- phone border overlay -->
+  <rect x="32" y="28" width="242" height="464" rx="28" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+
+  <!-- label -->
+  <text x="153" y="510" fill="#6c7382" font-size="11" text-anchor="middle" font-weight="500">Server list</text>
+
+
+  <!-- ══════════════════════ PHONE 2 — Agent Tab ══════════════════════ -->
+  <g filter="url(#shadow)">
+    <rect x="329" y="28" width="242" height="464" rx="28" fill="#14161b" stroke="#272b34" stroke-width="1.5"/>
+  </g>
+  <rect x="412" y="36" width="76" height="18" rx="9" fill="#0d0e12"/>
+
+  <g clip-path="url(#phone2)">
+    <!-- top tab bar -->
+    <rect x="329" y="28" width="242" height="44" fill="#14161b"/>
+    <!-- back -->
+    <text x="348" y="55" fill="#a6acb9" font-size="18">‹</text>
+    <!-- tabs -->
+    <text x="395" y="54" fill="#6aa6ff" font-size="11" font-weight="600" text-anchor="middle">Agent</text>
+    <rect x="376" y="56" width="38" height="2" rx="1" fill="#6aa6ff"/>
+    <text x="450" y="54" fill="#6c7382" font-size="11" font-weight="500" text-anchor="middle">Files</text>
+    <text x="510" y="54" fill="#6c7382" font-size="11" font-weight="500" text-anchor="middle">Git</text>
+    <rect x="329" y="72" width="242" height="1" fill="#1d2129"/>
+
+    <!-- context header -->
+    <rect x="329" y="73" width="242" height="48" fill="#14161b"/>
+    <rect x="341" y="82" width="26" height="26" rx="7" fill="#6aa6ff22" stroke="#6aa6ff44" stroke-width="1"/>
+    <text x="354" y="99" fill="#6aa6ff" font-size="14" text-anchor="middle">✦</text>
+    <text x="375" y="92" fill="#e7e9ee" font-size="11.5" font-weight="600">Refactor auth middleware</text>
+    <circle cx="375" cy="103" r="3.5" fill="#6cd093"/>
+    <circle cx="375" cy="103" r="5" fill="#6cd093" opacity=".18"/>
+    <text x="383" y="106" fill="#6c7382" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">devbox · Claude Code</text>
+    <rect x="329" y="121" width="242" height="1" fill="#1d2129"/>
+
+    <!-- chat content -->
+    <!-- user msg -->
+    <rect x="387" y="134" width="172" height="32" rx="10" fill="#6aa6ff22" stroke="#6aa6ff33" stroke-width="1"/>
+    <text x="473" y="148" fill="#e7e9ee" font-size="10.5" text-anchor="middle">Refactor the old auth</text>
+    <text x="473" y="160" fill="#e7e9ee" font-size="10.5" text-anchor="middle">middleware for compliance</text>
+
+    <!-- assistant thought -->
+    <rect x="341" y="176" width="178" height="22" rx="8" fill="#22262f" stroke="#272b34" stroke-width="1"/>
+    <text x="352" y="191" fill="#b48ef0" font-size="9">◈ Reading existing middleware…</text>
+
+    <!-- tool call: read -->
+    <rect x="341" y="206" width="196" height="38" rx="9" fill="#22262f" stroke="#272b34" stroke-width="1"/>
+    <rect x="352" y="214" width="18" height="18" rx="5" fill="#6aa6ff22"/>
+    <text x="361" y="227" fill="#6aa6ff" font-size="10" text-anchor="middle">📄</text>
+    <text x="377" y="221" fill="#a6acb9" font-size="9.5" font-weight="600">Read file</text>
+    <text x="377" y="233" fill="#6c7382" font-size="9" font-family="'JetBrains Mono','Fira Code',monospace">src/middleware/auth.ts</text>
+    <circle cx="526" cy="225" r="5" fill="#6cd09366"/>
+    <text x="526" y="228.5" fill="#6cd093" font-size="7" text-anchor="middle">✓</text>
+
+    <!-- tool call: write -->
+    <rect x="341" y="252" width="196" height="38" rx="9" fill="#22262f" stroke="#272b34" stroke-width="1"/>
+    <rect x="352" y="260" width="18" height="18" rx="5" fill="#6cd09322"/>
+    <text x="361" y="273" fill="#6cd093" font-size="10" text-anchor="middle">✎</text>
+    <text x="377" y="267" fill="#a6acb9" font-size="9.5" font-weight="600">Edit file</text>
+    <text x="377" y="279" fill="#6c7382" font-size="9" font-family="'JetBrains Mono','Fira Code',monospace">src/middleware/auth.ts</text>
+    <circle cx="526" cy="271" r="5" fill="#6cd09366"/>
+    <text x="526" y="274.5" fill="#6cd093" font-size="7" text-anchor="middle">✓</text>
+
+    <!-- permission card -->
+    <rect x="341" y="298" width="214" height="62" rx="11" fill="#1a1d24" stroke="#d9b06a44" stroke-width="1.5"/>
+    <text x="352" y="313" fill="#d9b06a" font-size="9" font-weight="600">⚠ Permission required</text>
+    <text x="352" y="326" fill="#a6acb9" font-size="9">Run: git commit -m "refactor auth"</text>
+    <rect x="352" y="337" width="70" height="18" rx="6" fill="#1d2129" stroke="#272b34" stroke-width="1"/>
+    <text x="387" y="349" fill="#a6acb9" font-size="9" text-anchor="middle">Deny</text>
+    <rect x="432" y="337" width="112" height="18" rx="6" fill="#6aa6ff"/>
+    <text x="488" y="349" fill="#0a1220" font-size="9" text-anchor="middle" font-weight="600">Allow always</text>
+
+    <!-- input bar -->
+    <rect x="329" y="442" width="242" height="50" fill="#14161b"/>
+    <rect x="329" y="442" width="242" height="1" fill="#1d2129"/>
+    <rect x="341" y="453" width="184" height="28" rx="10" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <text x="352" y="470" fill="#6c7382" font-size="10.5">Ask Claude…</text>
+    <rect x="533" y="453" width="28" height="28" rx="9" fill="#6aa6ff"/>
+    <text x="547" y="471" fill="#0a1220" font-size="16" text-anchor="middle">↑</text>
+  </g>
+
+  <rect x="329" y="28" width="242" height="464" rx="28" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+  <text x="450" y="510" fill="#6c7382" font-size="11" text-anchor="middle" font-weight="500">Agent tab</text>
+
+
+  <!-- ══════════════════════ PHONE 3 — Git Tab ══════════════════════ -->
+  <g filter="url(#shadow)">
+    <rect x="626" y="28" width="242" height="464" rx="28" fill="#14161b" stroke="#272b34" stroke-width="1.5"/>
+  </g>
+  <rect x="709" y="36" width="76" height="18" rx="9" fill="#0d0e12"/>
+
+  <g clip-path="url(#phone3)">
+    <!-- top tab bar -->
+    <rect x="626" y="28" width="242" height="44" fill="#14161b"/>
+    <text x="645" y="55" fill="#a6acb9" font-size="18">‹</text>
+    <text x="692" y="54" fill="#6c7382" font-size="11" font-weight="500" text-anchor="middle">Agent</text>
+    <text x="747" y="54" fill="#6c7382" font-size="11" font-weight="500" text-anchor="middle">Files</text>
+    <text x="807" y="54" fill="#6aa6ff" font-size="11" font-weight="600" text-anchor="middle">Git</text>
+    <!-- badge -->
+    <rect x="818" y="46" width="16" height="12" rx="6" fill="#d9b06a"/>
+    <text x="826" y="55.5" fill="#0a0b0e" font-size="8" text-anchor="middle" font-weight="700">4</text>
+    <rect x="793" y="56" width="28" height="2" rx="1" fill="#6aa6ff"/>
+    <rect x="626" y="72" width="242" height="1" fill="#1d2129"/>
+
+    <!-- context header: branch -->
+    <rect x="626" y="73" width="242" height="48" fill="#14161b"/>
+    <rect x="638" y="82" width="26" height="26" rx="7" fill="#6aa6ff22" stroke="#6aa6ff44" stroke-width="1"/>
+    <!-- branch icon -->
+    <circle cx="645" cy="89" r="2.5" fill="none" stroke="#6aa6ff" stroke-width="1.5"/>
+    <circle cx="651" cy="101" r="2.5" fill="none" stroke="#6aa6ff" stroke-width="1.5"/>
+    <line x1="645" y1="91.5" x2="645" y2="98" stroke="#6aa6ff" stroke-width="1.5"/>
+    <line x1="645" y1="98" x2="651" y2="98" stroke="#6aa6ff" stroke-width="1.5"/>
+    <circle cx="645" cy="101" r="2.5" fill="none" stroke="#6aa6ff" stroke-width="1.5"/>
+    <text x="672" y="92" fill="#e7e9ee" font-size="11.5" font-weight="600" font-family="'JetBrains Mono','Fira Code',monospace">feat/auth-refactor</text>
+    <circle cx="672" cy="103" r="3.5" fill="#6cd093"/>
+    <circle cx="672" cy="103" r="5" fill="#6cd093" opacity=".18"/>
+    <text x="680" y="106" fill="#6c7382" font-size="9.5">devbox · 4 changes</text>
+    <rect x="626" y="121" width="242" height="1" fill="#1d2129"/>
+
+    <!-- staged section -->
+    <text x="638" y="140" fill="#6c7382" font-size="9" letter-spacing=".6" font-weight="600">STAGED</text>
+    <rect x="690" y="130" width="18" height="13" rx="6.5" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <text x="699" y="140" fill="#6aa6ff" font-size="8.5" text-anchor="middle">1</text>
+
+    <!-- file row - staged -->
+    <rect x="648" y="147" width="16" height="16" rx="4.5" fill="#6aa6ff" stroke="none"/>
+    <text x="656" y="158.5" fill="#0a1220" font-size="9" text-anchor="middle" font-weight="700">✓</text>
+    <text x="671" y="159" fill="#6cd093" font-size="10" font-weight="600">A</text>
+    <text x="682" y="159" fill="#e7e9ee" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">src/middleware/auth.ts</text>
+    <text x="832" y="159" fill="#6cd093" font-size="8.5" text-anchor="end">+48</text>
+
+    <!-- unstaged section -->
+    <text x="638" y="182" fill="#6c7382" font-size="9" letter-spacing=".6" font-weight="600">UNSTAGED</text>
+    <rect x="696" y="172" width="18" height="13" rx="6.5" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <text x="705" y="182" fill="#d9b06a" font-size="8.5" text-anchor="middle">2</text>
+
+    <!-- file rows - unstaged -->
+    <rect x="648" y="189" width="16" height="16" rx="4.5" fill="none" stroke="#272b34" stroke-width="1.5"/>
+    <text x="671" y="201" fill="#d9b06a" font-size="10" font-weight="600">M</text>
+    <text x="682" y="201" fill="#e7e9ee" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">src/core/session.ts</text>
+    <text x="832" y="201" fill="#d9b06a" font-size="8.5" text-anchor="end">-12</text>
+
+    <rect x="648" y="211" width="16" height="16" rx="4.5" fill="none" stroke="#272b34" stroke-width="1.5"/>
+    <text x="671" y="223" fill="#d9b06a" font-size="10" font-weight="600">M</text>
+    <text x="682" y="223" fill="#e7e9ee" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">tests/auth.test.ts</text>
+    <text x="832" y="223" fill="#6cd093" font-size="8.5" text-anchor="end">+8</text>
+
+    <!-- untracked -->
+    <text x="638" y="244" fill="#6c7382" font-size="9" letter-spacing=".6" font-weight="600">UNTRACKED</text>
+    <rect x="700" y="234" width="18" height="13" rx="6.5" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <text x="709" y="244" fill="#5fc4d0" font-size="8.5" text-anchor="middle">1</text>
+    <rect x="648" y="251" width="16" height="16" rx="4.5" fill="none" stroke="#272b34" stroke-width="1.5"/>
+    <text x="671" y="263" fill="#5fc4d0" font-size="10" font-weight="600">U</text>
+    <text x="682" y="263" fill="#e7e9ee" font-size="9.5" font-family="'JetBrains Mono','Fira Code',monospace">src/middleware/tokens.ts</text>
+
+    <!-- diff snippet (bottom) -->
+    <rect x="638" y="280" width="210" height="130" rx="10" fill="#0a0b0e" stroke="#272b34" stroke-width="1"/>
+    <text x="648" y="296" fill="#6c7382" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">@@ -14,7 +14,8 @@</text>
+    <rect x="638" y="300" width="210" height="14" fill="#0c130f"/>
+    <text x="655" y="311" fill="#6cd093" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">+  const token = await rotate(sessionId);</text>
+    <rect x="638" y="314" width="210" height="14" fill="#130c0e"/>
+    <text x="648" y="325" fill="#6c7382" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">-</text>
+    <text x="655" y="325" fill="#e5737f" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">  const token = legacyGet(sessionId);</text>
+    <text x="648" y="340" fill="#6c7382" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace"> </text>
+    <text x="655" y="340" fill="#a6acb9" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">  if (!token) return null;</text>
+    <text x="648" y="355" fill="#6c7382" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace"> </text>
+    <text x="655" y="355" fill="#a6acb9" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">  await validateExpiry(token);</text>
+    <text x="648" y="370" fill="#6c7382" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace"> </text>
+    <text x="655" y="370" fill="#a6acb9" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">  return decode(token);</text>
+    <text x="648" y="385" fill="#6c7382" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace"> </text>
+    <text x="655" y="385" fill="#a6acb9" font-size="8.5" font-family="'JetBrains Mono','Fira Code',monospace">}</text>
+    <text x="648" y="400" fill="#a6acb9" font-size="8" font-family="'JetBrains Mono','Fira Code',monospace">+ 48  - 12  auth.ts</text>
+
+    <!-- commit bar -->
+    <rect x="626" y="442" width="242" height="50" fill="#14161b"/>
+    <rect x="626" y="442" width="242" height="1" fill="#1d2129"/>
+    <rect x="638" y="453" width="162" height="28" rx="10" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <text x="650" y="471" fill="#6c7382" font-size="10">refactor: rotate session tokens</text>
+    <rect x="808" y="453" width="50" height="28" rx="9" fill="#6aa6ff"/>
+    <text x="833" y="471" fill="#0a1220" font-size="10" text-anchor="middle" font-weight="600">Commit</text>
+  </g>
+
+  <rect x="626" y="28" width="242" height="464" rx="28" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+  <text x="747" y="510" fill="#6c7382" font-size="11" text-anchor="middle" font-weight="500">Git tab</text>
+</svg>

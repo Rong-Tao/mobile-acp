@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 340" font-family="'SF Pro Display','Inter',system-ui,sans-serif">
+  <defs>
+    <clipPath id="p1"><rect x="32" y="24" width="192" height="292" rx="22"/></clipPath>
+    <clipPath id="p2"><rect x="334" y="24" width="192" height="292" rx="22"/></clipPath>
+    <clipPath id="p3"><rect x="636" y="24" width="192" height="292" rx="22"/></clipPath>
+    <filter id="sh"><feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000" flood-opacity=".5"/></filter>
+    <!-- QR pattern via tiny rects in a 9x9 grid (simplified) -->
+  </defs>
+
+  <rect width="860" height="340" fill="#09090c"/>
+
+  <!-- arrows between phones -->
+  <line x1="228" y1="170" x2="330" y2="170" stroke="#272b34" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="330,165 338,170 330,175" fill="#272b34"/>
+  <line x1="530" y1="170" x2="632" y2="170" stroke="#272b34" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="632,165 640,170 632,175" fill="#272b34"/>
+
+  <!-- step labels on arrows -->
+  <text x="279" y="159" fill="#6c7382" font-size="9" text-anchor="middle">scan QR</text>
+  <text x="581" y="159" fill="#6c7382" font-size="9" text-anchor="middle">POST pubkey</text>
+  <text x="581" y="170" fill="#6c7382" font-size="9" text-anchor="middle">→ authorized_keys</text>
+
+
+  <!-- ══════════════ PHONE 1 — server terminal QR ══════════════ -->
+  <g filter="url(#sh)">
+    <rect x="32" y="24" width="192" height="292" rx="22" fill="#0a0b0e" stroke="#272b34" stroke-width="1.5"/>
+  </g>
+  <!-- terminal chrome -->
+  <rect x="32" y="24" width="192" height="32" rx="22" fill="#1a1d24"/>
+  <rect x="32" y="44" width="192" height="12" fill="#1a1d24"/>
+  <circle cx="52" cy="40" r="5" fill="#e5737f" opacity=".7"/>
+  <circle cx="66" cy="40" r="5" fill="#d9b06a" opacity=".7"/>
+  <circle cx="80" cy="40" r="5" fill="#6cd093" opacity=".7"/>
+  <text x="128" y="43.5" fill="#6c7382" font-size="8.5" text-anchor="middle">Terminal</text>
+
+  <g clip-path="url(#p1)">
+    <rect x="32" y="56" width="192" height="260" fill="#0a0b0e"/>
+    <!-- terminal output -->
+    <text x="44" y="74" fill="#5fc4d0" font-size="8.5" font-weight="700" font-family="monospace">mobile-acp</text>
+    <text x="105" y="74" fill="#a6acb9" font-size="8.5" font-family="monospace"> SSH key pairing</text>
+    <text x="44" y="88" fill="#6c7382" font-size="8" font-family="monospace">Server : kai@10.0.0.5:22</text>
+    <text x="44" y="99" fill="#6c7382" font-size="8" font-family="monospace">Pairing: port 2222 · 5 min</text>
+
+    <!-- QR code (stylized) -->
+    <!-- finder pattern top-left -->
+    <rect x="68" y="112" width="42" height="42" rx="2" fill="#e7e9ee"/>
+    <rect x="71" y="115" width="36" height="36" rx="1" fill="#0a0b0e"/>
+    <rect x="74" y="118" width="30" height="30" rx="1" fill="#e7e9ee"/>
+    <rect x="78" y="122" width="22" height="22" rx="1" fill="#0a0b0e"/>
+    <rect x="81" y="125" width="16" height="16" fill="#e7e9ee"/>
+
+    <!-- finder pattern top-right -->
+    <rect x="146" y="112" width="42" height="42" rx="2" fill="#e7e9ee"/>
+    <rect x="149" y="115" width="36" height="36" rx="1" fill="#0a0b0e"/>
+    <rect x="152" y="118" width="30" height="30" rx="1" fill="#e7e9ee"/>
+    <rect x="156" y="122" width="22" height="22" rx="1" fill="#0a0b0e"/>
+    <rect x="159" y="125" width="16" height="16" fill="#e7e9ee"/>
+
+    <!-- finder pattern bottom-left -->
+    <rect x="68" y="190" width="42" height="42" rx="2" fill="#e7e9ee"/>
+    <rect x="71" y="193" width="36" height="36" rx="1" fill="#0a0b0e"/>
+    <rect x="74" y="196" width="30" height="30" rx="1" fill="#e7e9ee"/>
+    <rect x="78" y="200" width="22" height="22" rx="1" fill="#0a0b0e"/>
+    <rect x="81" y="203" width="16" height="16" fill="#e7e9ee"/>
+
+    <!-- data cells (scattered) -->
+    <rect x="116" y="112" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="124" y="112" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="120" y="119" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="116" y="126" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="128" y="126" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="116" y="133" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="124" y="133" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="116" y="140" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="128" y="140" width="5" height="5" fill="#e7e9ee"/>
+
+    <rect x="116" y="190" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="128" y="190" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="120" y="197" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="116" y="204" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="126" y="204" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="116" y="211" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="128" y="211" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="116" y="218" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="124" y="218" width="8" height="5" fill="#e7e9ee"/>
+
+    <rect x="148" y="158" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="158" y="158" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="170" y="158" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="148" y="165" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="162" y="165" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="170" y="165" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="148" y="172" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="158" y="172" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="170" y="172" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="148" y="179" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="162" y="179" width="5" height="5" fill="#e7e9ee"/>
+
+    <rect x="68" y="158" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="78" y="158" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="90" y="158" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="100" y="158" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="68" y="165" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="82" y="165" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="92" y="165" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="68" y="172" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="76" y="172" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="90" y="172" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="100" y="172" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="68" y="179" width="8" height="5" fill="#e7e9ee"/>
+    <rect x="80" y="179" width="5" height="5" fill="#e7e9ee"/>
+    <rect x="92" y="179" width="8" height="5" fill="#e7e9ee"/>
+
+    <text x="128" y="252" fill="#6c7382" font-size="7.5" text-anchor="middle" font-family="monospace">Scan with mobile-acp app</text>
+    <!-- spinner -->
+    <text x="44" y="268" fill="#a6acb9" font-size="8" font-family="monospace">⠹ Waiting… (4:31)</text>
+  </g>
+
+  <rect x="32" y="24" width="192" height="292" rx="22" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+  <text x="128" y="330" fill="#6c7382" font-size="10" text-anchor="middle">① Server runs CLI</text>
+
+
+  <!-- ══════════════ PHONE 2 — camera viewfinder ══════════════ -->
+  <g filter="url(#sh)">
+    <rect x="334" y="24" width="192" height="292" rx="22" fill="#14161b" stroke="#272b34" stroke-width="1.5"/>
+  </g>
+  <rect x="394" y="30" width="72" height="14" rx="7" fill="#0d0e12"/>
+
+  <g clip-path="url(#p2)">
+    <rect x="334" y="24" width="192" height="40" fill="#14161b"/>
+    <text x="346" y="54" fill="#a6acb9" font-size="14">‹</text>
+    <text x="430" y="53" fill="#e7e9ee" font-size="13" text-anchor="middle" font-weight="600">Add server</text>
+    <rect x="334" y="64" width="192" height="1" fill="#1d2129"/>
+
+    <!-- seg control -->
+    <rect x="346" y="74" width="168" height="26" rx="9" fill="#22262f"/>
+    <rect x="348" y="76" width="82" height="22" rx="7" fill="#6aa6ff"/>
+    <text x="389" y="91" fill="#0a1220" font-size="10.5" text-anchor="middle" font-weight="600">Scan QR</text>
+    <text x="471" y="91" fill="#6c7382" font-size="10.5" text-anchor="middle">Manual</text>
+    <rect x="334" y="100" width="192" height="1" fill="#1d2129"/>
+
+    <text x="430" y="118" fill="#a6acb9" font-size="9" text-anchor="middle">Run on your server, scan the QR</text>
+
+    <!-- code block -->
+    <rect x="344" y="124" width="168" height="20" rx="6" fill="#0a0b0e" stroke="#1d2129" stroke-width="1"/>
+    <text x="353" y="138" fill="#6aa6ff" font-size="8.5" font-family="monospace">$</text>
+    <text x="361" y="138" fill="#a6acb9" font-size="8.5" font-family="monospace">npx -y mobile-acp-setup</text>
+
+    <!-- camera viewfinder -->
+    <rect x="355" y="152" width="150" height="130" rx="12" fill="#000" stroke="#6aa6ff" stroke-width="2"/>
+    <!-- camera feed simulation -->
+    <rect x="355" y="152" width="150" height="130" rx="12" fill="#111418"/>
+    <!-- corner markers -->
+    <path d="M367,164 L367,157 L374,157" fill="none" stroke="#6aa6ff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M493,164 L493,157 L486,157" fill="none" stroke="#6aa6ff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M367,270 L367,277 L374,277" fill="none" stroke="#6aa6ff" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M493,270 L493,277 L486,277" fill="none" stroke="#6aa6ff" stroke-width="2.5" stroke-linecap="round"/>
+
+    <!-- scan line animation suggestion -->
+    <line x1="358" y1="217" x2="502" y2="217" stroke="#6aa6ff" stroke-width="1" opacity=".5"/>
+
+    <!-- mini QR visible in viewfinder -->
+    <rect x="395" y="182" width="70" height="70" rx="2" fill="#e7e9ee" opacity=".9"/>
+    <rect x="398" y="185" width="28" height="28" rx="1" fill="#111418"/>
+    <rect x="401" y="188" width="22" height="22" rx="1" fill="#e7e9ee" opacity=".9"/>
+    <rect x="404" y="191" width="16" height="16" fill="#111418"/>
+    <rect x="407" y="194" width="10" height="10" fill="#e7e9ee" opacity=".9"/>
+    <rect x="432" y="185" width="28" height="28" rx="1" fill="#111418"/>
+    <rect x="435" y="188" width="22" height="22" rx="1" fill="#e7e9ee" opacity=".9"/>
+    <rect x="438" y="191" width="16" height="16" fill="#111418"/>
+    <rect x="441" y="194" width="10" height="10" fill="#e7e9ee" opacity=".9"/>
+    <rect x="398" y="219" width="28" height="28" rx="1" fill="#111418"/>
+    <rect x="401" y="222" width="22" height="22" rx="1" fill="#e7e9ee" opacity=".9"/>
+    <rect x="404" y="225" width="16" height="16" fill="#111418"/>
+    <rect x="407" y="228" width="10" height="10" fill="#e7e9ee" opacity=".9"/>
+
+    <text x="430" y="295" fill="#6c7382" font-size="8.5" text-anchor="middle" font-family="monospace">Code valid for 5 minutes</text>
+  </g>
+
+  <rect x="334" y="24" width="192" height="292" rx="22" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+  <text x="430" y="330" fill="#6c7382" font-size="10" text-anchor="middle">② App scans QR</text>
+
+
+  <!-- ══════════════ PHONE 3 — paired! ══════════════ -->
+  <g filter="url(#sh)">
+    <rect x="636" y="24" width="192" height="292" rx="22" fill="#14161b" stroke="#272b34" stroke-width="1.5"/>
+  </g>
+  <rect x="696" y="30" width="72" height="14" rx="7" fill="#0d0e12"/>
+
+  <g clip-path="url(#p3)">
+    <rect x="636" y="24" width="192" height="40" fill="#14161b"/>
+    <text x="648" y="54" fill="#a6acb9" font-size="14">‹</text>
+    <text x="732" y="53" fill="#e7e9ee" font-size="13" text-anchor="middle" font-weight="600">Add server</text>
+    <rect x="636" y="64" width="192" height="1" fill="#1d2129"/>
+
+    <!-- seg -->
+    <rect x="648" y="74" width="168" height="26" rx="9" fill="#22262f"/>
+    <rect x="650" y="76" width="82" height="22" rx="7" fill="#6aa6ff"/>
+    <text x="691" y="91" fill="#0a1220" font-size="10.5" text-anchor="middle" font-weight="600">Scan QR</text>
+    <text x="773" y="91" fill="#6c7382" font-size="10.5" text-anchor="middle">Manual</text>
+    <rect x="636" y="100" width="192" height="1" fill="#1d2129"/>
+
+    <!-- scanned confirmation card -->
+    <rect x="648" y="116" width="166" height="52" rx="11" fill="#1a1d24" stroke="#272b34" stroke-width="1"/>
+    <rect x="659" y="127" width="28" height="28" rx="8" fill="#6aa6ff22" stroke="#6aa6ff44" stroke-width="1"/>
+    <text x="673" y="145" fill="#6aa6ff" font-size="14" text-anchor="middle">✓</text>
+    <text x="697" y="134" fill="#e7e9ee" font-size="11" font-weight="600">kai@10.0.0.5</text>
+    <text x="697" y="147" fill="#6c7382" font-size="9" font-family="monospace">SSH port 22</text>
+    <!-- X button -->
+    <text x="800" y="138" fill="#6c7382" font-size="11" text-anchor="middle">×</text>
+
+    <!-- pairing button - success state -->
+    <rect x="648" y="180" width="166" height="40" rx="11" fill="#6cd093"/>
+    <text x="731" y="197" fill="#06140d" font-size="11" text-anchor="middle" font-weight="700">✓</text>
+    <text x="731" y="212" fill="#06140d" font-size="11" text-anchor="middle" font-weight="600">Connected!</text>
+
+    <!-- info text -->
+    <text x="731" y="240" fill="#6c7382" font-size="8.5" text-anchor="middle">Ed25519 key added to</text>
+    <text x="731" y="252" fill="#6c7382" font-size="8.5" text-anchor="middle" font-family="monospace">~/.ssh/authorized_keys</text>
+
+    <!-- navigating indicator -->
+    <rect x="648" y="266" width="166" height="30" rx="10" fill="#22262f" stroke="#1d2129" stroke-width="1"/>
+    <text x="731" y="285" fill="#6cd093" font-size="9" text-anchor="middle">Opening devbox…</text>
+  </g>
+
+  <rect x="636" y="24" width="192" height="292" rx="22" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+  <text x="732" y="330" fill="#6c7382" font-size="10" text-anchor="middle">③ Paired &amp; ready</text>
+</svg>
