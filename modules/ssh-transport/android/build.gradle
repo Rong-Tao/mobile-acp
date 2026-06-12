@@ -1,26 +1,21 @@
 apply plugin: 'com.android.library'
-apply plugin: 'org.jetbrains.kotlin.android'
-apply plugin: 'expo-module-gradle-plugin'
 
-buildFeatures {
-    buildConfig true
-}
+group = 'host.exp.exponent'
+version = '1.0.0'
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useDefaultAndroidSdkVersions()
 
 android {
-    compileSdkVersion safeExtGet("compileSdkVersion", 35)
-    defaultConfig {
-        minSdkVersion safeExtGet("minSdkVersion", 24)
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.majorVersion
-    }
-    namespace "expo.modules.sshtransport"
+  namespace "expo.modules.sshtransport"
+  buildFeatures {
+    buildConfig true
+  }
 }
 
 dependencies {
-    implementation 'com.github.mwiede:jsch:0.2.20'
+  implementation 'com.github.mwiede:jsch:0.2.20'
 }
