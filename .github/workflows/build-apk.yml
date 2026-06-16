@@ -67,12 +67,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mobile-acp-${{ github.sha }}
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
       - name: Create release (on tag)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          files: android/app/build/outputs/apk/release/app-release.apk
           name: ${{ github.ref_name }}
