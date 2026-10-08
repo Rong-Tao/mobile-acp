@@ -16,22 +16,28 @@ const KEY = 'mobile-acp:identities';
 // SecureStore keys may only contain [A-Za-z0-9._-] — no colons
 const credKey = (id: string) => `ssh-identity_${id}`;
 
+// Comment (3rd field) is cosmetic; it is always exactly the profile's username.
+function withComment(i: Identity): Identity {
+  const body = i.publicKey.trim().split(/\s+/).slice(0, 2).join(' ');
+  return { ...i, publicKey: `${body} ${i.user}` };
+}
+
 export async function loadIdentities(): Promise<Identity[]> {
   const raw = await AsyncStorage.getItem(KEY);
   if (!raw) return [];
-  try { return JSON.parse(raw) as Identity[]; } catch { return []; }
+  try { return (JSON.parse(raw) as Identity[]).map(withComment); } catch { return []; }
 }
 
 export async function createIdentity(
   user: string,
   keys: { privateKey: string; publicKey: string },
 ): Promise<Identity> {
-  // Rewrite the key comment (3rd field, cosmetic only) to identify the profile
+  // Key comment (3rd field, cosmetic only) is exactly the username
   const body = keys.publicKey.trim().split(/\s+/).slice(0, 2).join(' ');
   const identity: Identity = {
     id: `id-${Date.now()}`,
     user,
-    publicKey: `${body} ${user}@mobile-acp`,
+    publicKey: `${body} ${user}`,
     createdAt: Date.now(),
   };
   await SecureStore.setItemAsync(credKey(identity.id), keys.privateKey);
