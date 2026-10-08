@@ -291,11 +291,17 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [connUser, setConnUser] = useState<string | null>(null);
 
-  useEffect(() => { loadIdentities().then(setIdentities); }, []);
+  useEffect(() => {
+    loadIdentities().then(list => {
+      setIdentities(list);
+      if (list.length > 0) setForm(f => ({ ...f, auth: 'profile' }));
+    });
+  }, []);
 
   // Manual flow
   const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'keystore' });
   const [cred, setCred] = useState({ password: '', privateKey: '' });
+  const [manualIdentity, setManualIdentity] = useState<Identity | null>(null);
   const [testing, setTesting] = useState<null | 'run' | 'ok' | 'err'>(null);
   const [testErr, setTestErr] = useState('');
   const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -393,13 +399,23 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   };
 
   // ── Manual flow ──────────────────────────────────────────────
+  const manualKey = async (): Promise<string> => {
+    if (form.auth === 'profile') {
+      if (!manualIdentity) throw new Error('Pick a saved key first.');
+      const pk = await loadIdentityKey(manualIdentity.id);
+      if (!pk) throw new Error('Private key missing for this profile.');
+      return pk;
+    }
+    return cred.privateKey;
+  };
+
   const testManual = async () => {
     setTesting('run'); setTestErr('');
     if (!sshAvailable) { setTimeout(() => setTesting('ok'), 1200); return; }
     try {
       const auth = form.auth === 'password'
         ? { type: 'password' as const, password: cred.password }
-        : { type: 'key' as const, privateKey: cred.privateKey };
+        : { type: 'key' as const, privateKey: await manualKey() };
       const t = await SshTransport.connect({ host: form.host, port: Number(form.port) || 22, user: form.user, auth });
       const r = await t.exec('echo ok');
       t.close();
@@ -413,8 +429,12 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
 
   const saveManual = async () => {
     let privKey = cred.privateKey;
-    if (form.auth === 'keystore' && sshAvailable && NativeSsh) {
+    if (form.auth === 'profile') {
+      privKey = await manualKey();
+    } else if (form.auth === 'keystore' && sshAvailable && NativeSsh) {
       const kp = await NativeSsh.generateKeyPair();
+      // persist as a reusable profile so the public key stays accessible
+      await createIdentity(form.user.trim() || 'user', kp);
       privKey = kp.privateKey;
     }
     const server: Server = {
@@ -425,7 +445,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
       user: form.user,
       online: true,
       last: 'just now',
-      auth: form.auth as 'keystore' | 'key-file' | 'password',
+      auth: form.auth === 'password' ? 'password' : form.auth === 'key-file' ? 'key-file' : 'keystore',
     };
     const storedCred = form.auth === 'password'
       ? { type: 'password' as const, password: cred.password }
@@ -591,11 +611,13 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
               <Text style={{ fontFamily: T.uiFontMedium, fontSize: 12, color: T.tx1, marginBottom: 8 }}>Authentication</Text>
               <View style={{ gap: 8 }}>
                 {([
+                  ...(identities.length > 0 ? [['profile', 'key', 'Use saved key', 'Reuse an existing profile from this device']] : []),
                   ['keystore', 'lock', 'Generate key', 'New Ed25519 key in Android Keystore'],
                   ['key-file', 'download', 'Paste private key', 'Import a .pem / id_ed25519 file'],
                   ['password', 'key', 'Password', 'Sent over the encrypted channel'],
                 ] as [string, string, string, string][]).map(([val, ic, l, d]) => {
                   const on = form.auth === val;
+                  const recommended = val === (identities.length > 0 ? 'profile' : 'keystore');
                   return (
                     <Press key={val} onPress={() => setF('auth', val)} style={{
                       flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 11,
@@ -605,7 +627,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                           <Text style={{ fontFamily: T.uiFontMedium, fontSize: 14, color: T.tx0 }}>{l}</Text>
-                          {val === 'keystore' && <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 10.5, color: accent.hue }}>RECOMMENDED</Text>}
+                          {recommended && <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 10.5, color: accent.hue }}>RECOMMENDED</Text>}
                         </View>
                         <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2, marginTop: 1 }}>{d}</Text>
                       </View>
@@ -618,6 +640,26 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
               </View>
             </View>
 
+            {form.auth === 'profile' && (
+              <View style={{ gap: 8 }}>
+                {identities.map(i => {
+                  const on = manualIdentity?.id === i.id;
+                  return (
+                    <Press key={i.id} onPress={() => { setManualIdentity(i); if (!form.user.trim()) setF('user', i.user); }} style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 11,
+                      backgroundColor: on ? accent.dim : T.bg2, borderWidth: 1, borderColor: on ? accent.hue + '66' : T.border,
+                    }}>
+                      <Icon name="key" size={15} color={on ? accent.hue : T.tx2} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 13.5, color: T.tx0 }}>{i.user}</Text>
+                        <Text style={{ fontFamily: T.monoFont, fontSize: 10, color: T.tx2 }} numberOfLines={1} ellipsizeMode="middle">{i.publicKey}</Text>
+                      </View>
+                      {on && <Icon name="check" size={16} color={accent.hue} />}
+                    </Press>
+                  );
+                })}
+              </View>
+            )}
             {form.auth === 'password' && (
               <Field label="Password" value={cred.password} onChange={v => setCred(c => ({ ...c, password: v }))}
                 placeholder="SSH password" secure accent={accent} />
