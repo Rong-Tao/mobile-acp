@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TextInput, ActivityIndicator, Share } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { THEME, AccentType } from '../theme';
@@ -129,7 +130,7 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
 }
 
 // ── QR camera ─────────────────────────────────────────────────
-type QrPayload = { h: string; p: number; u: string; sp: number; t: string; e: number };
+type QrPayload = { h: string; p: number; u: string };
 
 function QrCamera({ onScan, accent }: { onScan: (data: string) => void; accent: AccentType }) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -177,8 +178,10 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   // QR flow
   const [qrPayload, setQrPayload] = useState<QrPayload | null>(null);
   const [qrError, setQrError] = useState('');
-  const [pairing, setPairing] = useState<'idle' | 'keygen' | 'posting' | 'testing' | 'ok' | 'err'>('idle');
+  const [pairing, setPairing] = useState<'idle' | 'keygen' | 'share' | 'testing' | 'ok' | 'err'>('idle');
   const [pairError, setPairError] = useState('');
+  const [keys, setKeys] = useState<{ privateKey: string; publicKey: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Manual flow
   const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'keystore' });
@@ -187,48 +190,42 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   const [testErr, setTestErr] = useState('');
   const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const resetQr = () => { setQrPayload(null); setQrError(''); setPairing('idle'); setPairError(''); };
+  const resetQr = () => { setQrPayload(null); setQrError(''); setPairing('idle'); setPairError(''); setKeys(null); setCopied(false); };
 
   // ── QR pairing ───────────────────────────────────────────────
   const handleQrScan = (raw: string) => {
     try {
       const p = JSON.parse(raw) as QrPayload;
-      if (!p.h || !p.u || !p.t || !p.e) throw new Error('missing fields');
-      if (Math.floor(Date.now() / 1000) > p.e) {
-        setQrError('QR code expired. Run the setup command again on your server.');
-        return;
-      }
+      if (!p.h || !p.u) throw new Error('missing fields');
       setQrError('');
-      setQrPayload(p);
+      setQrPayload({ h: p.h, p: Number(p.p) || 22, u: p.u });
     } catch {
       setQrError('Not a mobile-acp QR code. Make sure you\'re scanning the right code.');
     }
   };
 
-  const handlePair = async () => {
-    if (!qrPayload) return;
+  const handleKeygen = async () => {
     setPairing('keygen');
     setPairError('');
     try {
       if (!sshAvailable || !NativeSsh) throw new Error('Native SSH module not available. Please build a native development client.');
+      const kp = await NativeSsh.generateKeyPair();
+      setKeys(kp);
+      setPairing('share');
+    } catch (e: any) {
+      setPairing('err');
+      setPairError(String(e?.message ?? e));
+    }
+  };
 
-      const { privateKey, publicKey } = await NativeSsh.generateKeyPair();
-
-      setPairing('posting');
-      const res = await fetch(`http://${qrPayload.h}:${qrPayload.sp}/pair`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${qrPayload.t}` },
-        body: JSON.stringify({ pubkey: publicKey, name: 'mobile-acp' }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-
-      setPairing('testing');
+  const handleTest = async () => {
+    if (!qrPayload || !keys) return;
+    setPairing('testing');
+    setPairError('');
+    try {
       const transport = await SshTransport.connect({
         host: qrPayload.h, port: qrPayload.p, user: qrPayload.u,
-        auth: { type: 'key', privateKey },
+        auth: { type: 'key', privateKey: keys.privateKey },
       });
       await transport.exec('echo ok');
       transport.close();
@@ -243,14 +240,26 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
         last: 'just now',
         auth: 'keystore',
       };
-      await saveCredential(server.id, { type: 'key', privateKey });
+      await saveCredential(server.id, { type: 'key', privateKey: keys.privateKey });
       await upsertServer(server);
       setPairing('ok');
       setTimeout(() => onPaired(server), 700);
     } catch (e: any) {
-      setPairing('err');
+      setPairing('share');
       setPairError(String(e?.message ?? e));
     }
+  };
+
+  const copyPubkey = async () => {
+    if (!keys) return;
+    await Clipboard.setStringAsync(keys.publicKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  const sharePubkey = () => {
+    if (!keys) return;
+    Share.share({ message: keys.publicKey }).catch(() => {});
   };
 
   // ── Manual flow ──────────────────────────────────────────────
@@ -296,11 +305,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
     onPaired(server);
   };
 
-  const pairLabels: Record<string, string> = {
-    idle: 'Pair & connect', keygen: 'Generating key…', posting: 'Exchanging key…',
-    testing: 'Testing SSH…', ok: 'Connected!', err: 'Try again',
-  };
-  const busy = pairing === 'keygen' || pairing === 'posting' || pairing === 'testing' || pairing === 'ok';
+  const busy = pairing === 'keygen' || pairing === 'testing' || pairing === 'ok';
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg0 }}>
@@ -363,21 +368,66 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
               </View>
             )}
 
-            <Press
-              onPress={!busy ? handlePair : undefined}
-              style={{
-                height: 52, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10,
-                backgroundColor: pairing === 'ok' ? T.green : busy ? accent.hue + 'aa' : accent.hue,
-              }}
-            >
-              {busy && pairing !== 'ok' && <ActivityIndicator size="small" color={accent.on} />}
-              {pairing === 'ok' && <Icon name="check" size={18} color="#fff" />}
-              <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15.5, color: accent.on }}>{pairLabels[pairing]}</Text>
-            </Press>
+            {/* step 1: generate key */}
+            {(pairing === 'idle' || pairing === 'keygen' || pairing === 'err') && (
+              <>
+                <Press
+                  onPress={pairing !== 'keygen' ? handleKeygen : undefined}
+                  style={{
+                    height: 52, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10,
+                    backgroundColor: pairing === 'keygen' ? accent.hue + 'aa' : accent.hue,
+                  }}
+                >
+                  {pairing === 'keygen' && <ActivityIndicator size="small" color={accent.on} />}
+                  <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15.5, color: accent.on }}>
+                    {pairing === 'keygen' ? 'Generating key…' : pairing === 'err' ? 'Try again' : 'Generate key'}
+                  </Text>
+                </Press>
+                <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, textAlign: 'center', lineHeight: 19 }}>
+                  A new Ed25519 key is generated on this device. Next you'll paste its public half into the script waiting on your server.
+                </Text>
+              </>
+            )}
 
-            <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, textAlign: 'center', lineHeight: 19 }}>
-              A new Ed25519 key is generated on this device and added to the server's authorized_keys.
-            </Text>
+            {/* step 2: share pubkey + test */}
+            {(pairing === 'share' || pairing === 'testing' || pairing === 'ok') && keys && (
+              <>
+                <View style={{ backgroundColor: '#0a0b0e', borderWidth: 1, borderColor: T.borderSoft, borderRadius: 11, padding: 12, gap: 10 }}>
+                  <Text style={{ fontFamily: T.uiFontMedium, fontSize: 12, color: T.tx1 }}>Public key — paste into the script on your server</Text>
+                  <Text style={{ fontFamily: T.monoFont, fontSize: 10.5, color: T.tx1, lineHeight: 15 }} numberOfLines={3} ellipsizeMode="middle">
+                    {keys.publicKey}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Press onPress={copyPubkey} style={{ flex: 1, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, backgroundColor: T.bg3, borderWidth: 1, borderColor: copied ? T.green + '66' : T.border }}>
+                      <Icon name={copied ? 'check' : 'copy'} size={15} color={copied ? T.green : T.tx1} />
+                      <Text style={{ fontFamily: T.uiFontMedium, fontSize: 13, color: copied ? T.green : T.tx1 }}>{copied ? 'Copied' : 'Copy'}</Text>
+                    </Press>
+                    <Press onPress={sharePubkey} style={{ flex: 1, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border }}>
+                      <Icon name="share" size={15} color={T.tx1} />
+                      <Text style={{ fontFamily: T.uiFontMedium, fontSize: 13, color: T.tx1 }}>Share…</Text>
+                    </Press>
+                  </View>
+                </View>
+
+                <Press
+                  onPress={pairing === 'share' ? handleTest : undefined}
+                  style={{
+                    height: 52, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10,
+                    backgroundColor: pairing === 'ok' ? T.green : pairing === 'testing' ? accent.hue + 'aa' : accent.hue,
+                  }}
+                >
+                  {pairing === 'testing' && <ActivityIndicator size="small" color={accent.on} />}
+                  {pairing === 'ok' && <Icon name="check" size={18} color="#fff" />}
+                  <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15.5, color: accent.on }}>
+                    {pairing === 'ok' ? 'Connected!' : pairing === 'testing' ? 'Testing SSH…' : 'Test connection'}
+                  </Text>
+                </Press>
+
+                <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, textAlign: 'center', lineHeight: 19 }}>
+                  Send the key to your computer any way you like (it's public), paste it into the waiting script, then test.
+                </Text>
+              </>
+            )}
           </>
         )}
 

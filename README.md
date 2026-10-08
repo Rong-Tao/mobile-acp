@@ -12,7 +12,7 @@
 
 ## What it does
 
-- **Pair a server in 30 seconds** — run one command on the server, scan the QR code, done. An Ed25519 key is generated on the device and added to `~/.ssh/authorized_keys` automatically.
+- **Pair a server in 30 seconds** — run one command on the server, scan the QR code, paste one line. An Ed25519 key is generated on the device; the public key travels over your existing SSH session, so no inbound ports or firewall changes are needed.
 - **Run coding agents** — spawn Claude Code (or any ACP-compatible agent) over SSH. Full streaming output: thoughts, tool calls, permission prompts, plan updates.
 - **Browse files & Git** — real directory tree and `git status`/`diff`/`commit` over the same SSH connection, no extra daemons.
 - **Zero server deploy** — the server needs nothing beyond `sshd` and whatever agent you want to run (`npx`, `claude`, etc.).
@@ -47,7 +47,7 @@ On the server (needs Node ≥ 18 and curl):
 curl -fsSL https://raw.githubusercontent.com/Rong-Tao/mobile-acp/main/server/install.sh | bash
 ```
 
-This prints a QR code in the terminal. Open the app → **Add Server → Scan QR**. The app generates an Ed25519 keypair, POSTs the public key to a 5-minute local HTTP server, and tests the SSH connection — all in one tap.
+This prints a QR code in the terminal (host / SSH port / user). Open the app → **Add Server → Scan QR**. The app generates an Ed25519 keypair and shows the public key — copy it, paste it into the waiting script (any channel works; it's public), then tap **Test connection**. Works through any firewall: nothing ever connects inbound except SSH itself.
 
 > **Repeat pairings:** `install.sh` caches `setup.mjs` in `~/.local/share/mobile-acp-setup/`, so subsequent runs skip the download.
 

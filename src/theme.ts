@@ -73,6 +73,7 @@ export const PATHS: Record<string, string> = {
   edit: 'M5 19h14M14 5l4 4-9 9H5v-4z',
   trash: 'M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13',
   copy: 'M9 9h10v10H9zM5 15V5h10',
+  share: 'M12 3v12M8 6l4-4 4 4M5 11v9h14v-9',
   play: 'M7 5l11 7-11 7z',
   warn: 'M12 4l9 16H3zM12 10v4M12 17h.01',
   wifiOff: 'M3 3l18 18M9 17h.01M5 12.5a10 10 0 0 1 4-2.3M2 8.8a16 16 0 0 1 4-2.4M22 8.8a16 16 0 0 0-7-3.5M18.5 12.5a10 10 0 0 0-2-1.3',
