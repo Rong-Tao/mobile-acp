@@ -24,6 +24,19 @@ private data class SpawnState(
 )
 
 class SshTransportModule : Module() {
+    companion object {
+        init {
+            // JSch picks JDK-native EdDSA/XDH when it detects Java >= 15, but on
+            // Android those jce classes are multi-release stubs (D8 drops
+            // META-INF/versions) that throw UnsupportedOperationException.
+            // Pin the BouncyCastle implementations unconditionally.
+            JSch.setConfig("xdh", "com.jcraft.jsch.bc.XDH")
+            JSch.setConfig("keypairgen.eddsa", "com.jcraft.jsch.bc.KeyPairGenEdDSA")
+            JSch.setConfig("ssh-ed25519", "com.jcraft.jsch.bc.SignatureEd25519")
+            JSch.setConfig("ssh-ed448", "com.jcraft.jsch.bc.SignatureEd448")
+        }
+    }
+
     private val sessions = ConcurrentHashMap<String, Session>()
     private val spawns = ConcurrentHashMap<String, SpawnState>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
