@@ -91,7 +91,7 @@ function KeysSheet({ open, onClose, accent }: { open: boolean; onClose: () => vo
   };
 
   return (
-    <Sheet open={open} onClose={onClose}>
+    <Sheet open={open} onClose={onClose} height="72%">
       <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}>
         <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 16, color: T.tx0, paddingTop: 6 }}>SSH keys</Text>
         <Text style={{ fontFamily: T.uiFont, fontSize: 12.5, color: T.tx2, lineHeight: 19 }}>

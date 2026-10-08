@@ -112,7 +112,10 @@ export function Sheet({ open, onClose, children, height = 'auto', pad = true }: 
           <View style={{ alignItems: 'center', paddingVertical: 10 }}>
             <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: T.bg4 }} />
           </View>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={pad ? { paddingTop: 8 } : undefined} showsVerticalScrollIndicator={false}>
+          {/* With height 'auto' the container has no fixed height, so flex:1
+              collapses the ScrollView to zero — size to content instead and
+              let the parent's maxHeight cap it. */}
+          <ScrollView style={sheetHeight === undefined ? { flexGrow: 0 } : { flex: 1 }} contentContainerStyle={pad ? { paddingTop: 8 } : undefined} showsVerticalScrollIndicator={false}>
             {children}
           </ScrollView>
         </Animated.View>
