@@ -10,6 +10,7 @@ import { Press, Dot, Sheet, TopBar, Btn, Field, Seg } from '../components/Primit
 import { NativeSsh, sshAvailable } from '../../modules/ssh-transport/src';
 import { saveCredential } from '../core/credentials';
 import { loadServers, upsertServer, removeServer } from '../core/servers';
+import { Identity, loadIdentities, createIdentity, loadIdentityKey, removeIdentity } from '../core/identities';
 import { SshTransport } from '../core/ssh-transport';
 
 const T = THEME;
@@ -56,12 +57,105 @@ function ServerCard({ s, accent, onOpen, onMenu }: { s: Server; accent: AccentTy
   );
 }
 
+// ── Keys (identities) sheet ──────────────────────────────────
+function KeysSheet({ open, onClose, accent }: { open: boolean; onClose: () => void; accent: AccentType }) {
+  const [identities, setIdentities] = useState<Identity[]>([]);
+  const [newUser, setNewUser] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [copiedId, setCopiedId] = useState('');
+
+  useEffect(() => { if (open) loadIdentities().then(setIdentities); }, [open]);
+
+  const generate = async () => {
+    const user = newUser.trim();
+    if (!user || busy) return;
+    setBusy(true); setErr('');
+    try {
+      if (!sshAvailable || !NativeSsh) throw new Error('Native SSH module not available.');
+      const kp = await NativeSsh.generateKeyPair();
+      await createIdentity(user, kp);
+      setIdentities(await loadIdentities());
+      setNewUser('');
+    } catch (e: any) {
+      setErr(String(e?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = async (i: Identity) => {
+    await Clipboard.setStringAsync(i.publicKey);
+    setCopiedId(i.id);
+    setTimeout(() => setCopiedId(''), 1600);
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 12 }}>
+        <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 16, color: T.tx0, paddingTop: 6 }}>SSH keys</Text>
+        <Text style={{ fontFamily: T.uiFont, fontSize: 12.5, color: T.tx2, lineHeight: 19 }}>
+          Each profile is a username + Ed25519 key that lives on this device. Add the public key to any server's authorized_keys and reuse it everywhere.
+        </Text>
+
+        {identities.map(i => (
+          <View key={i.id} style={{ backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12, padding: 12, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+              <Icon name="key" size={16} color={accent.hue} />
+              <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: T.tx0, flex: 1 }}>{i.user}</Text>
+              <Press onPress={async () => setIdentities(await removeIdentity(i.id))} style={{ padding: 5 }}>
+                <Icon name="trash" size={15} color={T.tx2} />
+              </Press>
+            </View>
+            <Text style={{ fontFamily: T.monoFont, fontSize: 10, color: T.tx2 }} numberOfLines={1} ellipsizeMode="middle">{i.publicKey}</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Press onPress={() => copy(i)} style={{ flex: 1, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: T.bg3, borderWidth: 1, borderColor: copiedId === i.id ? T.green + '66' : T.border }}>
+                <Icon name={copiedId === i.id ? 'check' : 'copy'} size={14} color={copiedId === i.id ? T.green : T.tx1} />
+                <Text style={{ fontFamily: T.uiFontMedium, fontSize: 12.5, color: copiedId === i.id ? T.green : T.tx1 }}>{copiedId === i.id ? 'Copied' : 'Copy public key'}</Text>
+              </Press>
+              <Press onPress={() => Share.share({ message: i.publicKey }).catch(() => {})} style={{ height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingHorizontal: 13, backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border }}>
+                <Icon name="share" size={14} color={T.tx1} />
+                <Text style={{ fontFamily: T.uiFontMedium, fontSize: 12.5, color: T.tx1 }}>Share</Text>
+              </Press>
+            </View>
+          </View>
+        ))}
+
+        {err !== '' && (
+          <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.red }}>{err}</Text>
+        )}
+
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <TextInput
+              value={newUser}
+              onChangeText={setNewUser}
+              placeholder="username (e.g. rong)"
+              placeholderTextColor={T.tx2}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{ height: 44, backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border, borderRadius: 11, paddingHorizontal: 13, fontFamily: T.monoFont, fontSize: 13, color: T.tx0 }}
+            />
+          </View>
+          <Press onPress={generate} style={{ height: 44, paddingHorizontal: 15, borderRadius: 11, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, backgroundColor: newUser.trim() && !busy ? accent.hue : T.bg3 }}>
+            {busy
+              ? <ActivityIndicator size="small" color={accent.on} />
+              : <Icon name="plus" size={16} color={newUser.trim() ? accent.on : T.tx2} />}
+            <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 13.5, color: newUser.trim() && !busy ? accent.on : T.tx2 }}>Generate</Text>
+          </Press>
+        </View>
+      </View>
+    </Sheet>
+  );
+}
+
 // ── Server List ───────────────────────────────────────────────
 type ServerListProps = { accent: AccentType; onOpen: (s: Server) => void; onAdd: () => void };
 
 export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
   const [servers, setServers] = useState<Server[]>([]);
   const [menu, setMenu] = useState<Server | null>(null);
+  const [keysOpen, setKeysOpen] = useState(false);
 
   useEffect(() => { loadServers().then(setServers); }, []);
 
@@ -80,13 +174,21 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
               <Text style={{ fontFamily: T.monoFontMedium, fontSize: 11, color: accent.hue, letterSpacing: 1.2 }}>MOBILE·ACP</Text>
               <Text style={{ fontFamily: T.uiFontBold, fontSize: 23, color: T.tx0, letterSpacing: -0.46, marginTop: 2 }}>Servers</Text>
             </View>
-            <Press onPress={onAdd} style={{
-              height: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14,
-              backgroundColor: accent.hue, borderRadius: 11,
-            }}>
-              <Icon name="plus" size={18} color={accent.on} />
-              <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.on }}>Add</Text>
-            </Press>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Press onPress={() => setKeysOpen(true)} style={{
+                width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border, borderRadius: 11,
+              }}>
+                <Icon name="key" size={17} color={T.tx1} />
+              </Press>
+              <Press onPress={onAdd} style={{
+                height: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14,
+                backgroundColor: accent.hue, borderRadius: 11,
+              }}>
+                <Icon name="plus" size={18} color={accent.on} />
+                <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.on }}>Add</Text>
+              </Press>
+            </View>
           </View>
         </View>
       </SafeAreaView>
@@ -114,6 +216,8 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
           Zero server deploy — just <Text style={{ color: T.tx1 }}>sshd</Text>.
         </Text>
       </ScrollView>
+
+      <KeysSheet open={keysOpen} onClose={() => setKeysOpen(false)} accent={accent} />
 
       <Sheet open={!!menu} onClose={() => setMenu(null)}>
         <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
@@ -182,6 +286,10 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   const [pairError, setPairError] = useState('');
   const [keys, setKeys] = useState<{ privateKey: string; publicKey: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [identities, setIdentities] = useState<Identity[]>([]);
+  const [connUser, setConnUser] = useState<string | null>(null);
+
+  useEffect(() => { loadIdentities().then(setIdentities); }, []);
 
   // Manual flow
   const [form, setForm] = useState({ name: '', host: '', port: '22', user: '', auth: 'keystore' });
@@ -190,7 +298,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   const [testErr, setTestErr] = useState('');
   const setF = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
-  const resetQr = () => { setQrPayload(null); setQrError(''); setPairing('idle'); setPairError(''); setKeys(null); setCopied(false); };
+  const resetQr = () => { setQrPayload(null); setQrError(''); setPairing('idle'); setPairError(''); setKeys(null); setCopied(false); setConnUser(null); };
 
   // ── QR pairing ───────────────────────────────────────────────
   const handleQrScan = (raw: string) => {
@@ -205,12 +313,31 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
   };
 
   const handleKeygen = async () => {
+    if (!qrPayload) return;
     setPairing('keygen');
     setPairError('');
     try {
       if (!sshAvailable || !NativeSsh) throw new Error('Native SSH module not available. Please build a native development client.');
       const kp = await NativeSsh.generateKeyPair();
+      // persist as a reusable profile so the key survives this pairing
+      await createIdentity(qrPayload.u, kp);
+      setIdentities(await loadIdentities());
       setKeys(kp);
+      setConnUser(qrPayload.u);
+      setPairing('share');
+    } catch (e: any) {
+      setPairing('err');
+      setPairError(String(e?.message ?? e));
+    }
+  };
+
+  const handleUseIdentity = async (identity: Identity) => {
+    setPairError('');
+    try {
+      const privateKey = await loadIdentityKey(identity.id);
+      if (!privateKey) throw new Error('Private key missing for this profile.');
+      setKeys({ privateKey, publicKey: identity.publicKey });
+      setConnUser(identity.user);
       setPairing('share');
     } catch (e: any) {
       setPairing('err');
@@ -222,9 +349,10 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
     if (!qrPayload || !keys) return;
     setPairing('testing');
     setPairError('');
+    const user = connUser ?? qrPayload.u;
     try {
       const transport = await SshTransport.connect({
-        host: qrPayload.h, port: qrPayload.p, user: qrPayload.u,
+        host: qrPayload.h, port: qrPayload.p, user,
         auth: { type: 'key', privateKey: keys.privateKey },
       });
       await transport.exec('echo ok');
@@ -235,7 +363,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
         name: qrPayload.h,
         host: qrPayload.h,
         port: qrPayload.p,
-        user: qrPayload.u,
+        user,
         online: true,
         last: 'just now',
         auth: 'keystore',
@@ -368,9 +496,25 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
               </View>
             )}
 
-            {/* step 1: generate key */}
+            {/* step 1: pick a profile or generate a new key */}
             {(pairing === 'idle' || pairing === 'keygen' || pairing === 'err') && (
               <>
+                {identities.length > 0 && (
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 11.5, color: T.tx2, letterSpacing: 0.6, textTransform: 'uppercase' }}>Use existing key</Text>
+                    {identities.map(i => (
+                      <Press key={i.id} onPress={() => handleUseIdentity(i)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13, backgroundColor: T.bg2, borderWidth: 1, borderColor: T.border, borderRadius: 12 }}>
+                        <Icon name="key" size={16} color={accent.hue} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 13.5, color: T.tx0 }}>{i.user}</Text>
+                          <Text style={{ fontFamily: T.monoFont, fontSize: 10, color: T.tx2 }} numberOfLines={1} ellipsizeMode="middle">{i.publicKey}</Text>
+                        </View>
+                        <Icon name="chevR" size={16} color={T.tx2} />
+                      </Press>
+                    ))}
+                  </View>
+                )}
+
                 <Press
                   onPress={pairing !== 'keygen' ? handleKeygen : undefined}
                   style={{
@@ -380,11 +524,11 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
                 >
                   {pairing === 'keygen' && <ActivityIndicator size="small" color={accent.on} />}
                   <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15.5, color: accent.on }}>
-                    {pairing === 'keygen' ? 'Generating key…' : pairing === 'err' ? 'Try again' : 'Generate key'}
+                    {pairing === 'keygen' ? 'Generating key…' : pairing === 'err' ? 'Try again' : identities.length > 0 ? 'Generate new key' : 'Generate key'}
                   </Text>
                 </Press>
                 <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, textAlign: 'center', lineHeight: 19 }}>
-                  A new Ed25519 key is generated on this device. Next you'll paste its public half into the script waiting on your server.
+                  New keys are saved as reusable profiles (see the key icon on the home screen). Existing keys skip the paste step if the server already trusts them.
                 </Text>
               </>
             )}
