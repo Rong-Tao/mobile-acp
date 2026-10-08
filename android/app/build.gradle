@@ -120,6 +120,10 @@ android {
         jniLibs {
             useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
         }
+        resources {
+            // jsch and bcprov are multi-release jars that both ship this file
+            excludes += ['META-INF/versions/**/OSGI-INF/MANIFEST.MF']
+        }
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
