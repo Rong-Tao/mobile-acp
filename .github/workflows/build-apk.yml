@@ -32,6 +32,10 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # default package set includes legacy 'tools', which Google removed
+          # from the SDK repo; install only what we actually need
+          packages: 'platform-tools'
 
       - name: Install Android build tools & NDK
         run: |
