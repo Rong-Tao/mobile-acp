@@ -116,6 +116,33 @@ function addToAuthorizedKeys(pubkey) {
   return 'added';
 }
 
+function detectSshPort() {
+  // Running over SSH? SSH_CONNECTION = "<client-ip> <client-port> <server-ip> <server-port>"
+  // — the 4th field is the port sshd actually accepted this session on.
+  const sc = (process.env.SSH_CONNECTION ?? '').trim().split(/\s+/);
+  if (sc.length === 4 && /^\d+$/.test(sc[3])) return parseInt(sc[3], 10);
+  try {
+    const conf = readFileSync('/etc/ssh/sshd_config', 'utf8');
+    const m = conf.match(/^\s*Port\s+(\d+)/m);
+    if (m) return parseInt(m[1], 10);
+  } catch { /* unreadable: fall through */ }
+  return 22;
+}
+
+// Best-effort reachability probe: connect to our own public address so the
+// request hairpins through the cloud edge, exercising the firewall rules.
+async function probeSelf(host, port) {
+  try {
+    const res = await fetch(`http://${host}:${port}/pair`, {
+      method: 'OPTIONS',
+      signal: AbortSignal.timeout(4000),
+    });
+    return res.status === 204;
+  } catch {
+    return false;
+  }
+}
+
 // ── main ──────────────────────────────────────────────────────
 const ips      = localIPs();
 const host     = await pickIP(ips);
@@ -123,7 +150,7 @@ const port     = await freePort(SETUP_PORT);
 const token    = randomBytes(16).toString('hex');
 const expiry   = Math.floor(Date.now() / 1000) + EXPIRY_SEC;
 const sshUser  = userInfo().username;
-const sshPort  = 22;
+const sshPort  = detectSshPort();
 
 const payload  = JSON.stringify({ h: host, p: sshPort, u: sshUser, sp: port, t: token, e: expiry });
 
@@ -192,7 +219,20 @@ server.listen(port, '0.0.0.0', async () => {
     console.log(`  ⚠ ${host} is a private address — the phone must be on the same network.`);
     console.log(`    For a cloud server, rerun with MOBILE_ACP_HOST=<public-ip>.`);
   } else {
-    console.log(`  ⚠ Make sure your firewall allows inbound TCP ${port} (pairing) and 22 (SSH).`);
+    process.stdout.write(`  Checking that port ${port} is reachable from outside… `);
+    const ok = await probeSelf(host, port);
+    if (ok) {
+      console.log('\x1b[32mOK\x1b[0m');
+    } else if (process.env.MOBILE_ACP_FORCE) {
+      console.log('\x1b[33mFAILED (continuing: MOBILE_ACP_FORCE set)\x1b[0m');
+    } else {
+      console.log('\x1b[31mFAILED\x1b[0m\n');
+      console.log(`\x1b[31m✗ ${host}:${port} is not reachable from the internet.\x1b[0m`);
+      console.log(`  Open inbound TCP ${port} in your cloud security group / firewall, then rerun.`);
+      console.log(`  (If this probe is wrong — some networks block hairpin connections —`);
+      console.log(`   rerun with MOBILE_ACP_FORCE=1 to show the QR anyway.)\n`);
+      process.exit(1);
+    }
   }
   console.log('');
 
