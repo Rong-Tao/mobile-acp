@@ -26,10 +26,12 @@ export async function createIdentity(
   user: string,
   keys: { privateKey: string; publicKey: string },
 ): Promise<Identity> {
+  // Rewrite the key comment (3rd field, cosmetic only) to identify the profile
+  const body = keys.publicKey.trim().split(/\s+/).slice(0, 2).join(' ');
   const identity: Identity = {
     id: `id-${Date.now()}`,
     user,
-    publicKey: keys.publicKey,
+    publicKey: `${body} ${user}@mobile-acp`,
     createdAt: Date.now(),
   };
   await SecureStore.setItemAsync(credKey(identity.id), keys.privateKey);
