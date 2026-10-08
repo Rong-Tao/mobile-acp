@@ -13,7 +13,8 @@ export type Identity = {
 };
 
 const KEY = 'mobile-acp:identities';
-const credKey = (id: string) => `ssh-identity:${id}`;
+// SecureStore keys may only contain [A-Za-z0-9._-] — no colons
+const credKey = (id: string) => `ssh-identity_${id}`;
 
 export async function loadIdentities(): Promise<Identity[]> {
   const raw = await AsyncStorage.getItem(KEY);

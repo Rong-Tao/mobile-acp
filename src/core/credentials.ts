@@ -1,5 +1,6 @@
 // Stores SSH credentials in the Android Keystore-backed SecureStore.
-// Key format: "ssh-cred:<serverId>"
+// Key format: "ssh-cred_<serverId>" (SecureStore keys may only contain
+// [A-Za-z0-9._-] — no colons)
 
 import * as SecureStore from 'expo-secure-store';
 
@@ -7,7 +8,7 @@ export type StoredCred =
   | { type: 'password'; password: string }
   | { type: 'key'; privateKey: string; passphrase?: string };
 
-const key = (serverId: string) => `ssh-cred:${serverId}`;
+const key = (serverId: string) => `ssh-cred_${serverId}`;
 
 export async function saveCredential(serverId: string, cred: StoredCred): Promise<void> {
   await SecureStore.setItemAsync(key(serverId), JSON.stringify(cred));
