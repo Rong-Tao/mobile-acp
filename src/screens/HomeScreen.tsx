@@ -181,13 +181,15 @@ export function ServerList({ accent, onOpen, onAdd }: ServerListProps) {
               }}>
                 <Icon name="key" size={17} color={T.tx1} />
               </Press>
-              <Press onPress={onAdd} style={{
-                height: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14,
-                backgroundColor: accent.hue, borderRadius: 11,
-              }}>
-                <Icon name="plus" size={18} color={accent.on} />
-                <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.on }}>Add</Text>
-              </Press>
+              {servers.length > 0 && (
+                <Press onPress={onAdd} style={{
+                  height: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14,
+                  backgroundColor: accent.hue, borderRadius: 11,
+                }}>
+                  <Icon name="plus" size={18} color={accent.on} />
+                  <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.on }}>Add</Text>
+                </Press>
+              )}
             </View>
           </View>
         </View>
