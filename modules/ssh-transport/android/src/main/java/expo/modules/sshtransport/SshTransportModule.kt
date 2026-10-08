@@ -15,7 +15,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
+import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
+import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.bouncycastle.crypto.util.OpenSSHPrivateKeyUtil
+import org.bouncycastle.crypto.util.OpenSSHPublicKeyUtil
 
 private data class SpawnState(
     val channel: ChannelExec,
@@ -193,22 +200,44 @@ class SshTransportModule : Module() {
 
         // ── generate Ed25519 keypair ───────────────────────────────
         // Returns { privateKey: PEM string, publicKey: OpenSSH authorized_keys line }
+        // Generated with BouncyCastle directly: JSch can generate Ed25519 keys
+        // but KeyPairEdDSA.getPrivateKey() throws UnsupportedOperationException,
+        // so it cannot write them out. BC encodes the openssh-key-v1 format,
+        // which jsch.addIdentity() reads fine.
         AsyncFunction("generateKeyPair") {
-            val jsch = JSch()
-            val kpair = KeyPair.genKeyPair(jsch, KeyPair.ED25519)
+            try {
+                val gen = Ed25519KeyPairGenerator()
+                gen.init(Ed25519KeyGenerationParameters(SecureRandom()))
+                val kp = gen.generateKeyPair()
+                val priv = kp.private as Ed25519PrivateKeyParameters
+                val pub = kp.public as Ed25519PublicKeyParameters
 
-            val privOs = ByteArrayOutputStream()
-            kpair.writePrivateKey(privOs)
+                val privBlob = OpenSSHPrivateKeyUtil.encodePrivateKey(priv)
+                val pem = buildString {
+                    append("-----BEGIN OPENSSH PRIVATE KEY-----\n")
+                    val b64 = android.util.Base64.encodeToString(privBlob, android.util.Base64.NO_WRAP)
+                    var i = 0
+                    while (i < b64.length) {
+                        append(b64, i, minOf(i + 70, b64.length))
+                        append('\n')
+                        i += 70
+                    }
+                    append("-----END OPENSSH PRIVATE KEY-----\n")
+                }
 
-            val pubOs = ByteArrayOutputStream()
-            kpair.writePublicKey(pubOs, "mobile-acp")
+                val pubBlob = OpenSSHPublicKeyUtil.encodePublicKey(pub)
+                val pubLine = "ssh-ed25519 " +
+                    android.util.Base64.encodeToString(pubBlob, android.util.Base64.NO_WRAP) + " mobile-acp"
 
-            kpair.dispose()
-
-            mapOf(
-                "privateKey" to privOs.toString("UTF-8"),
-                "publicKey" to pubOs.toString("UTF-8").trim(),
-            )
+                mapOf(
+                    "privateKey" to pem,
+                    "publicKey" to pubLine,
+                )
+            } catch (t: Throwable) {
+                // surface the full chain — Expo only shows the top-level message
+                throw RuntimeException(
+                    "generateKeyPair failed: ${t.stackTraceToString().take(2000)}", t)
+            }
         }
 
         OnDestroy {
