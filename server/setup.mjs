@@ -44,24 +44,50 @@ function localIPs() {
   return out;
 }
 
-async function pickIP(ips) {
-  if (ips.length === 0) return '127.0.0.1';
-  if (ips.length === 1) return ips[0];
-  console.log('\nMultiple interfaces detected:');
-  ips.forEach((ip, i) => console.log(`  [${i + 1}] ${ip}`));
+const PRIVATE_RE = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/;
 
-  // When run via `curl | bash`, stdin is the pipe (not a TTY) — auto-pick the first IP.
+// Cloud VMs only see their private IP on local interfaces; the phone needs
+// the public one. Ask an external echo service (2s timeout, best effort).
+async function publicIP() {
+  for (const url of ['https://api.ipify.org', 'https://checkip.amazonaws.com']) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      const ip = (await res.text()).trim();
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return ip;
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+async function pickIP(ips) {
+  // Explicit override wins: MOBILE_ACP_HOST=1.2.3.4
+  if (process.env.MOBILE_ACP_HOST) return process.env.MOBILE_ACP_HOST;
+
+  const pub = await publicIP();
+  // Public IP first unless it's one of the local interfaces already
+  const candidates = pub && !ips.includes(pub)
+    ? [`${pub} (public)`, ...ips]
+    : [...ips];
+  const values = pub && !ips.includes(pub) ? [pub, ...ips] : [...ips];
+
+  if (values.length === 0) return '127.0.0.1';
+  if (values.length === 1) return values[0];
+
+  console.log('\nAddresses detected:');
+  candidates.forEach((ip, i) => console.log(`  [${i + 1}] ${ip}`));
+
+  // When run via `curl | bash`, stdin is the pipe (not a TTY) — auto-pick the first.
   if (!process.stdin.isTTY) {
-    console.log(`\nAuto-selected ${ips[0]} (run directly for interactive selection)`);
-    return ips[0];
+    console.log(`\nAuto-selected ${values[0]} (set MOBILE_ACP_HOST=<ip> to override)`);
+    return values[0];
   }
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise(resolve => {
     rl.question('\nSelect [1]: ', answer => {
       rl.close();
-      const idx = Math.max(0, Math.min(parseInt(answer || '1', 10) - 1, ips.length - 1));
-      resolve(ips[idx]);
+      const idx = Math.max(0, Math.min(parseInt(answer || '1', 10) - 1, values.length - 1));
+      resolve(values[idx]);
     });
   });
 }
@@ -161,7 +187,14 @@ server.listen(port, '0.0.0.0', async () => {
   console.clear();
   console.log('\x1b[36m\x1b[1mmobile-acp\x1b[0m  SSH key pairing\n');
   console.log(`  Server  : \x1b[1m${sshUser}@${host}:${sshPort}\x1b[0m`);
-  console.log(`  Pairing : port ${port}  ·  expires in ${EXPIRY_SEC / 60} min\n`);
+  console.log(`  Pairing : port ${port}  ·  expires in ${EXPIRY_SEC / 60} min`);
+  if (PRIVATE_RE.test(host)) {
+    console.log(`  ⚠ ${host} is a private address — the phone must be on the same network.`);
+    console.log(`    For a cloud server, rerun with MOBILE_ACP_HOST=<public-ip>.`);
+  } else {
+    console.log(`  ⚠ Make sure your firewall allows inbound TCP ${port} (pairing) and 22 (SSH).`);
+  }
+  console.log('');
 
   const qrStr = await qrcode.toString(payload, { type: 'terminal', small: true });
   console.log(qrStr);
