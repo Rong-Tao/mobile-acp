@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14161b"/>
+      <stop offset="1" stop-color="#0d0e12"/>
+    </linearGradient>
+    <linearGradient id="chev" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ebbff"/>
+      <stop offset="1" stop-color="#5a92f2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#6aa6ff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#6aa6ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- background -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <!-- subtle inner border like app cards -->
+  <rect x="26" y="26" width="972" height="972" rx="210" fill="none" stroke="#272b34" stroke-width="6" opacity="0.8"/>
+
+  <!-- prompt chevron ❯ -->
+  <path d="M 356 318 L 546 512 L 356 706"
+        fill="none" stroke="url(#chev)" stroke-width="112"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- cursor underscore _ -->
+  <rect x="596" y="650" width="180" height="56" rx="24" fill="#6cd093"/>
+</svg>

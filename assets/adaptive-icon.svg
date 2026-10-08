@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="chev" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8ebbff"/>
+      <stop offset="1" stop-color="#5a92f2"/>
+    </linearGradient>
+  </defs>
+  <!-- transparent bg; adaptive background color comes from app.json (#0d0e12) -->
+  <!-- mark scaled into the ~66% safe zone -->
+  <g transform="translate(512 512) scale(0.62) translate(-512 -512)">
+    <path d="M 356 318 L 546 512 L 356 706"
+          fill="none" stroke="url(#chev)" stroke-width="112"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="596" y="650" width="180" height="56" rx="24" fill="#6cd093"/>
+  </g>
+</svg>
