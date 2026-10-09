@@ -2,7 +2,22 @@
 
 > 本地调试细节(私有服务器、测试链路搭建)见 `NOTES.local.md`(gitignored,不入库)。
 
-## 未发布(working tree)— 2026-10-09
+## 未发布(working tree)— 2026-10-09 (第二批)
+
+**会话持久化 + 后台通知:**
+- **持久化 agent 进程**(`src/core/persist.ts`):spawn 包装为 setsid 脱离 + FIFO stdin(0<> 自持写端
+  永不 EOF)+ stdout 追加 log;SSH 断了(锁屏/冻结/app 被杀)turn 在服务器上照常跑完;
+  重连复用同一进程,tail 从文件末尾接流 + 二次 initialize + session/load 续上。
+  服务器只需 POSIX sh/mkfifo/setsid,缺了自动回退普通 spawn。dispose 只断通道不杀 agent
+- 已知取舍:adapter 进程常驻服务器按 (agent,project) 累积(谁先用谁复用);adapter 崩溃时
+  client 只见静默(stderr 进 err.log);cat>FIFO 必须前台(后台 job stdin 被 sh 重定向 /dev/null)
+- **后台本地通知**(`src/core/notify.ts`, expo-notifications):app 不在前台时,turn 完成/
+  agent 等权限会弹通知;前台与 web 一律 no-op;app 被系统冻结后 JS 停摆通知发不出——
+  靠持久化兜底(回来 session/load 全在)。真机验证待 APK
+- 验证:`gcp-acp.manual.test.ts` 新增 persist 用例(真实 SSH:断连 10s→服务器继续 55s 跑完
+  →重连回放含 marker)✓;UI 冒烟 8/8(persist 开启下全部复测)✓;tsc/核心测试 ✓
+
+## 2026-10-09 (第一批,已发 v0.1.18)
 
 **Agent/Thread 分层 + 会话配置:**
 - 核心重构:`LiveAgent`(一个 agent 进程)与 `LiveSession`(其上的一个 thread/ACP session)分层;

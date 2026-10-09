@@ -8,6 +8,7 @@ import type { SessionInfo, SessionModeState } from '@agentclientprotocol/sdk';
 import { AgentClient } from './acp/agent-client';
 import { SessionStore, type SessionState } from './acp/session-store';
 import { loadAgentPrefs, saveAgentPref } from './agent-prefs';
+import { persistentSpawnCmd } from './persist';
 import type { Transport } from './transport';
 
 export interface LiveAgentOptions {
@@ -18,6 +19,10 @@ export interface LiveAgentOptions {
   cwd: string;
   /** agent 标识（claude/codex/gemini），用于按 project 记住配置 */
   agentId?: string;
+  /** 持久化模式：agent 进程 setsid 脱离 SSH，断连后任务照跑，重连复用（见 persist.ts） */
+  persist?: boolean;
+  /** app 在后台时的提醒回调（turn 完成 / 待权限），由 UI 层注入 */
+  notify?: (title: string, body?: string) => void;
   env?: Record<string, string>;
 }
 
@@ -36,7 +41,14 @@ export class LiveSession {
     this.store.setBusy(true);
     try {
       const resp = await this.owner.agent.prompt(this.sessionId, blocks);
-      if (resp.stopReason === 'cancelled') this.store.markCancelled();
+      if (resp.stopReason === 'cancelled') {
+        this.store.markCancelled();
+      } else {
+        // app 在后台时提醒一下（前台 no-op）
+        const entries = this.store.getState().entries;
+        const last = [...entries].reverse().find((e) => e.type === 'assistant_message');
+        this.owner.opts.notify?.('Agent finished', last && 'text' in last ? last.text.slice(0, 120) : undefined);
+      }
     } finally {
       this.store.setBusy(false);
     }
@@ -92,9 +104,12 @@ export class LiveAgent {
     }
     const live = new LiveAgent(opts);
     live.cwd = cwd;
+    const spawnCmd = opts.persist
+      ? persistentSpawnCmd(opts.cmd, cwd, opts.agentId ?? 'agent')
+      : opts.cmd;
     live.agent = await AgentClient.start({
       transport: opts.transport,
-      cmd: opts.cmd,
+      cmd: spawnCmd,
       cwd,
       env: opts.env,
       handlers: {
@@ -107,6 +122,7 @@ export class LiveAgent {
               resolve({ outcome: { outcome: 'cancelled' } });
               return;
             }
+            opts.notify?.('Agent needs permission', req.toolCall?.title ?? undefined);
             store.setPendingPermission({
               request: req,
               resolve: (optionId) => {

@@ -116,4 +116,38 @@ describe(`ACP handshake on ${HOST} (real ssh, non-interactive shell)`, () => {
       agent.dispose();
     }
   }, 600000);
+
+  it('persist mode: turn survives disconnect, reconnect picks up result', async () => {
+    const AGENT_ID = 'persist-test';
+    const CMD = 'npx -y @agentclientprotocol/claude-agent-acp';
+    const marker = `PERSIST-VITEST-${Date.now()}`;
+
+    // 连接 1：persist 模式起 agent，发一个 40 秒任务，10 秒后"杀 app"
+    const a1 = await LiveAgent.connect({ transport, cmd: CMD, cwd: '~/mobile-acp-toy', agentId: AGENT_ID, persist: true });
+    const t1 = await a1.newThread();
+    if (t1.modes?.availableModes.some((m) => m.id === 'bypassPermissions')) {
+      await t1.setMode('bypassPermissions');
+    }
+    const sessionId = t1.sessionId;
+    t1.send(`Use Bash to run exactly: sleep 40 && echo ${marker} — then reply stating the marker.`).catch(() => {});
+    await new Promise((r) => setTimeout(r, 10000));
+    a1.dispose(); // 只杀通道(cat/tail)，adapter setsid 存活
+    console.log('disconnected mid-turn; waiting 55s for server-side completion…');
+    await new Promise((r) => setTimeout(r, 55000));
+
+    // 连接 2：复用同一 adapter，load 回放应包含断连期间完成的结果
+    const a2 = await LiveAgent.connect({ transport, cmd: CMD, cwd: '~/mobile-acp-toy', agentId: AGENT_ID, persist: true });
+    try {
+      const t2 = await a2.openThread(sessionId);
+      const texts = t2.store.getState().entries
+        .map((e) => ('text' in e ? e.text : e.type === 'tool_call' ? JSON.stringify(e.content) : ''))
+        .join('\n');
+      console.log('replayed entries:', t2.store.getState().entries.length, '| marker found:', texts.includes(marker));
+      expect(texts).toContain(marker);
+    } finally {
+      a2.dispose();
+      // 清掉实验 adapter 进程和目录
+      await transport.exec('for d in ~/.mobile-acp/agents/*/; do kill "$(cat "$d/pid" 2>/dev/null)" 2>/dev/null; done; rm -rf ~/.mobile-acp; true');
+    }
+  }, 600000);
 });

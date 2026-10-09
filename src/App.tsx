@@ -18,6 +18,7 @@ import type { Server, Project } from './data/types';
 import { ServerList, AddServer } from './screens/HomeScreen';
 import { ServerDetail } from './screens/ServerDetailScreen';
 import { MainShell } from './screens/MainShell';
+import { setupNotifications } from './core/notify';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,6 +42,8 @@ export default function App() {
 
   const [nav, setNav] = useState<NavState>({ screen: 'home' });
   const accent: AccentType = accentFor('blue');
+
+  useEffect(() => { setupNotifications(); }, []); // 通知权限 + channel（web no-op）
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

@@ -11,6 +11,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { SessionInfo } from '@agentclientprotocol/sdk';
 import { LiveAgent, LiveSession } from './live';
+import { notifyIfBackground } from './notify';
 import { WsTransport } from './ws-transport';
 import { SshTransport, type SshConfig } from './ssh-transport';
 import type { Transport, ExecResult } from './transport';
@@ -122,7 +123,11 @@ function useLiveValue(
         exec = (cmd, c) => transport.exec(cmd, c ? { cwd: c } : undefined);
         // transport 就绪：exec 先行可用，agent 还在启动
         setBase({ session: null, status: 'connecting', error: null, exec });
-        const live = await LiveAgent.connect({ transport, cmd: agentCmd, cwd, agentId });
+        const live = await LiveAgent.connect({
+          transport, cmd: agentCmd, cwd, agentId,
+          persist: true,            // agent 进程脱离 SSH 存活,断连任务照跑
+          notify: notifyIfBackground, // 后台时 turn 完成/待权限弹本地通知
+        });
         if (state.dead) { live.dispose(); transport.close(); return; }
         state.live = live;
         const session = await live.resumeOrNewThread();
