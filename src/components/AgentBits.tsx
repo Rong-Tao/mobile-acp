@@ -1,7 +1,7 @@
 // AgentTab 原型拆出的共享视觉组件：InlineMd / ToolCard / Bubble。
 // LiveAgentTab（真实 ACP 会话）使用这些组件渲染消息。
 
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { THEME, AccentType } from '../theme';
 import type { Message } from '../data/types';
