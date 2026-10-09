@@ -6,8 +6,8 @@ import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform } fro
 import { THEME, AccentType } from '../theme';
 import { Icon } from '../components/Icon';
 import { Press, Spinner, Sheet } from '../components/Primitives';
-import { InlineMd, ToolCard, Bubble } from './AgentTab';
-import type { Message } from '../data/mock';
+import { InlineMd, ToolCard, Bubble } from '../components/AgentBits';
+import type { Message } from '../data/types';
 import { LiveSession, useSessionState } from '../core/live';
 import type { PendingPermission, ThreadEntry, ToolCallEntry } from '../core/acp/session-store';
 import type { PlanEntry } from '@agentclientprotocol/sdk';

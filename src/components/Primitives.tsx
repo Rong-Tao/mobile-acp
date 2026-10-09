@@ -12,14 +12,16 @@ const T = THEME;
 type PressProps = {
   children: ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   style?: object | object[];
   disabled?: boolean;
 };
 
-export function Press({ children, onPress, style, disabled }: PressProps) {
+export function Press({ children, onPress, onLongPress, style, disabled }: PressProps) {
   return (
     <TouchableOpacity
       onPress={disabled ? undefined : onPress}
+      onLongPress={disabled ? undefined : onLongPress}
       activeOpacity={disabled ? 1 : 0.65}
       disabled={disabled}
       style={style as any}

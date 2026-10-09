@@ -14,7 +14,7 @@ import {
 } from '@expo-google-fonts/jetbrains-mono';
 import * as SplashScreen from 'expo-splash-screen';
 import { THEME, accentFor, AccentType } from './theme';
-import { DATA, Server, Project } from './data/mock';
+import type { Server, Project } from './data/types';
 import { ServerList, AddServer } from './screens/HomeScreen';
 import { ServerDetail } from './screens/ServerDetailScreen';
 import { MainShell } from './screens/MainShell';

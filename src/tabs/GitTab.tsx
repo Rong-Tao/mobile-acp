@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { THEME, AccentType } from '../theme';
-import { DATA, GitFile, DiffHunk } from '../data/mock';
+import type { GitFile, DiffHunk } from '../data/types';
 import { Icon } from '../components/Icon';
 import { Press, Btn, Sheet, EmptyHint } from '../components/Primitives';
 import { HighlightedLine } from '../components/CodeBlock';
@@ -206,10 +206,10 @@ type GitTabProps = { accent: AccentType; exec?: ExecFn; cwd?: string };
 export function GitTab({ accent, exec, cwd }: GitTabProps) {
   const useMock = !exec || !cwd;
 
-  const [staged, setStaged]     = useState<GitFile[]>(() => useMock ? DATA.git.staged : []);
-  const [unstaged, setUnstaged] = useState<GitFile[]>(() => useMock ? DATA.git.unstaged : []);
-  const [untracked, setUntracked] = useState<GitFile[]>(() => useMock ? DATA.git.untracked : []);
-  const [stagedSet, setStagedSet] = useState<Set<string>>(() => new Set(useMock ? DATA.git.staged.map(f => f.path) : []));
+  const [staged, setStaged]     = useState<GitFile[]>([]);
+  const [unstaged, setUnstaged] = useState<GitFile[]>([]);
+  const [untracked, setUntracked] = useState<GitFile[]>([]);
+  const [stagedSet, setStagedSet] = useState<Set<string>>(new Set());
   const [loading, setLoading]   = useState(!useMock);
   const [diff, setDiff]         = useState<DiffState>(null);
   const [diffLoading, setDiffLoading] = useState(false);
@@ -253,10 +253,7 @@ export function GitTab({ accent, exec, cwd }: GitTabProps) {
   });
 
   const openDiff = async (file: GitFile, isStaged: boolean) => {
-    if (!exec || !cwd) {
-      setDiff({ path: DATA.diff.path, hunks: DATA.diff.hunks, addTotal: 14, delTotal: 6 });
-      return;
-    }
+    if (!exec || !cwd) return;
     setDiffLoading(true);
     setDiff({ path: file.path, hunks: [], addTotal: 0, delTotal: 0 });
     try {

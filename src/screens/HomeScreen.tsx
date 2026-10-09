@@ -4,7 +4,7 @@ import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { THEME, AccentType } from '../theme';
-import { Server } from '../data/mock';
+import { Server } from '../data/types';
 import { Icon } from '../components/Icon';
 import { Press, Dot, Sheet, TopBar, Btn, Field, Seg } from '../components/Primitives';
 import { NativeSsh, sshAvailable } from '../../modules/ssh-transport/src';
@@ -411,7 +411,7 @@ export function AddServer({ accent, onBack, onPaired }: AddServerProps) {
 
   const testManual = async () => {
     setTesting('run'); setTestErr('');
-    if (!sshAvailable) { setTimeout(() => setTesting('ok'), 1200); return; }
+    if (!sshAvailable) { setTesting('err'); setTestErr('SSH module unavailable on this platform'); return; }
     try {
       const auth = form.auth === 'password'
         ? { type: 'password' as const, password: cred.password }

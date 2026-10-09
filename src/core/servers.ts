@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Server } from '../data/mock';
+import type { Server } from '../data/types';
 
 const KEY = 'mobile-acp:servers';
 

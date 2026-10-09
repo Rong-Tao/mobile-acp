@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, Animated, ActivityIndicator } from 'react-native';
 import { THEME, AccentType } from '../theme';
-import { DATA, TreeNode } from '../data/mock';
+import type { TreeNode } from '../data/types';
 import { Icon } from '../components/Icon';
 import { Press, Sheet, EmptyHint } from '../components/Primitives';
 import { CodeBlock } from '../components/CodeBlock';
@@ -121,7 +121,7 @@ type FilesTabProps = { accent: AccentType; exec?: ExecFn; cwd?: string };
 export function FilesTab({ accent, exec, cwd }: FilesTabProps) {
   const useMock = !exec || !cwd;
 
-  const [tree, setTree]         = useState<TreeNode[]>(() => useMock ? DATA.tree : []);
+  const [tree, setTree]         = useState<TreeNode[]>(() => []);
   const [loadingDirs, setLoadingDirs] = useState<Set<string>>(new Set());
   const [rootLoading, setRootLoading] = useState(!useMock);
   const [openMap, setOpenMap]   = useState<Record<string, boolean>>({});
@@ -169,7 +169,7 @@ export function FilesTab({ accent, exec, cwd }: FilesTabProps) {
     setPreviewNode(node);
     setPreviewContent('');
     if (useMock) {
-      setPreviewContent(node.id === 'f-readme' ? DATA.readme : DATA.pkgJson);
+      setPreviewContent('(not connected)');
       return;
     }
     setPreviewLoading(true);

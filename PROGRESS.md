@@ -1,5 +1,21 @@
 # Development Progress
 
+## v0.1.12 — 2026-10-09
+
+**去 mock 化：所有界面接真实数据**
+- ServerDetail Projects：真实 SSH 扫描/浏览远端目录，`git` 真实分支 + dirty 数，按 server 持久化（AsyncStorage）；长按移除；"Scan repos" 扫 home 下 git 仓库
+- ServerDetail Agents：`command -v` 真实探测 claude/codex/gemini + 版本；Install 走真实 `npm i -g` spawn 流式输出（原来是假动画）
+- ServerDetail 顶部 Online/Offline 为真实连接状态，失败可点重试；连接结果回写 HomeScreen 的 online/last
+- MainShell：删掉假 threads 列表/假搜索/假 reconnect；agent picker 切换会真实重启会话；连接状态来自 live.status
+- Agent tab 无会话时显示真实状态面板（connecting/error+retry），不再渲染假对话
+- Git/Files tab 断线时显示空状态而非 mock 数据；手动添加服务器在无 SSH 模块平台上"测试连接"如实报错（原来假装成功）
+- `src/data/mock.ts` 删除 → `src/data/types.ts`（纯类型）；原型 AgentTab 删除，共享视觉组件拆到 `components/AgentBits.tsx`
+- 新增 `src/core/remote.ts`（statProjects/listDirs/scanGitRepos/detectAgents，shell 转义安全）+ `test/remote.test.ts`：7 个测试对真实 bridge/git/文件系统全过
+
+**已知残留**
+- e2e.test.ts 两例在本 dev VM 上因 OAuth token 与运行中的 Claude Code 冲突而失败（HEAD 基线同样失败，环境问题）
+- SSH 断线重连/keepalive 仍未做（手动 Retry 已有）
+
 ## v0.1.0 — 2026-06-12
 
 ### 已完成
