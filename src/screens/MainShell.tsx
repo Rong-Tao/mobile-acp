@@ -8,13 +8,14 @@ import { Press, Dot, Spinner, Sheet, Btn } from '../components/Primitives';
 import { LiveAgentTab } from '../tabs/LiveAgentTab';
 import { FilesTab } from '../tabs/FilesTab';
 import { GitTab } from '../tabs/GitTab';
+import { ThreadsTab } from '../tabs/ThreadsTab';
 import { LiveProvider, SshLiveProvider, useLive } from '../core/live-context';
 import { loadCredential } from '../core/credentials';
 import type { SshConfig } from '../core/ssh-transport';
 
 const T = THEME;
 
-type TabId = 'agent' | 'files' | 'git';
+type TabId = 'agent' | 'threads' | 'files' | 'git';
 
 // 可选 agent（ACP 启动命令都是真实的；没装的选了会在连接时报错并提示）
 const AGENT_CHOICES = [
@@ -27,6 +28,7 @@ const AGENT_CHOICES = [
 function TopTabs({ tab, setTab, accent, onBack }: { tab: TabId; setTab: (t: TabId) => void; accent: AccentType; onBack: () => void }) {
   const TABS: { id: TabId; label: string; icon: string }[] = [
     { id: 'agent', label: 'Agent', icon: 'cmd' },
+    { id: 'threads', label: 'Threads', icon: 'thread' },
     { id: 'files', label: 'Files', icon: 'folder' },
     { id: 'git', label: 'Git', icon: 'branch' },
   ];
@@ -55,15 +57,16 @@ function TopTabs({ tab, setTab, accent, onBack }: { tab: TabId; setTab: (t: TabI
 // ── Context Header ────────────────────────────────────────────
 type Conn = 'online' | 'connecting' | 'offline';
 
-function ContextHeader({ tab, accent, conn, curAgent, onAgentTap, serverName, projectName }:
-  { tab: TabId; accent: AccentType; conn: Conn; curAgent: typeof AGENT_CHOICES[0]; onAgentTap: () => void; serverName: string; projectName: string }) {
+function ContextHeader({ tab, accent, conn, curAgent, onAgentTap, onNewThread, serverName, projectName }:
+  { tab: TabId; accent: AccentType; conn: Conn; curAgent: typeof AGENT_CHOICES[0]; onAgentTap: () => void; onNewThread: () => void; serverName: string; projectName: string }) {
 
   const avatar = tab === 'agent'
     ? { icon: curAgent.icon, tint: curAgent.tint }
+    : tab === 'threads' ? { icon: 'thread', tint: curAgent.tint }
     : tab === 'files' ? { icon: 'folder', tint: accent.hue } : { icon: 'branch', tint: accent.hue };
 
-  const title = tab === 'agent' ? curAgent.name : projectName;
-  const sub = tab === 'agent' ? `${projectName} · ${serverName}` : `${serverName} · ${projectName}`;
+  const title = tab === 'agent' ? curAgent.name : tab === 'threads' ? 'Threads' : projectName;
+  const sub = tab === 'agent' || tab === 'threads' ? `${projectName} · ${serverName}` : `${serverName} · ${projectName}`;
   const connColor = conn === 'online' ? T.green : conn === 'connecting' ? T.yellow : T.red;
 
   return (
@@ -82,7 +85,7 @@ function ContextHeader({ tab, accent, conn, curAgent, onAgentTap, serverName, pr
         </View>
       </Press>
       {tab === 'agent' && (
-        <Press onPress={onAgentTap} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: accent.dim }}>
+        <Press onPress={onNewThread} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: accent.dim }}>
           <Icon name="plus" size={19} color={accent.hue} />
         </Press>
       )}
@@ -115,7 +118,7 @@ export function MainShell(props: MainShellProps) {
 
   if (ssh) {
     return (
-      <SshLiveProvider key={`${agent.id}-${gen}`} ssh={ssh} cwd={props.project.path} agentCmd={agent.cmd}>
+      <SshLiveProvider key={`${agent.id}-${gen}`} ssh={ssh} cwd={props.project.path} agentCmd={agent.cmd} agentId={agent.id}>
         {inner}
       </SshLiveProvider>
     );
@@ -123,7 +126,7 @@ export function MainShell(props: MainShellProps) {
 
   // 没有存储的 SSH 凭证时，回退到 dev bridge（WS）
   return (
-    <LiveProvider key={`${agent.id}-${gen}`} cwd={props.project.path} agentCmd={agent.cmd}>
+    <LiveProvider key={`${agent.id}-${gen}`} cwd={props.project.path} agentCmd={agent.cmd} agentId={agent.id}>
       {inner}
     </LiveProvider>
   );
@@ -152,6 +155,7 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
           conn={conn}
           curAgent={curAgent}
           onAgentTap={() => setAgentPicker(true)}
+          onNewThread={() => { live.newThread().catch(() => {}); }}
           serverName={server.name}
           projectName={project.name}
         />
@@ -159,10 +163,16 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
 
       <View style={{ flex: 1 }}>
         {tab === 'agent' && (
-          live.session
-            ? <LiveAgentTab session={live.session} accent={accent} />
-            : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={onReconnect} />
+          live.threadLoading
+            ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                <Spinner size={22} color={accent.hue} />
+                <Text style={{ fontFamily: T.uiFontMedium, fontSize: 13.5, color: T.tx1 }}>Opening thread…</Text>
+              </View>
+            : live.session
+              ? <LiveAgentTab key={live.session.sessionId} session={live.session} accent={accent} />
+              : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={onReconnect} />
         )}
+        {tab === 'threads' && <ThreadsTab accent={accent} onOpened={() => setTabRaw('agent')} />}
         {tab === 'files' && <FilesTab accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
         {tab === 'git'   && <GitTab   accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
       </View>
@@ -192,6 +202,7 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
           })}
         </View>
       </Sheet>
+
     </View>
   );
 }

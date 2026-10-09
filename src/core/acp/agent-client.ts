@@ -9,8 +9,11 @@ import {
   type Agent,
   type Client,
   type InitializeResponse,
+  type ListSessionsResponse,
+  type LoadSessionResponse,
   type NewSessionResponse,
   type PromptResponse,
+  type SessionConfigOption,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
@@ -92,6 +95,25 @@ export class AgentClient {
 
   newSession(cwd: string): Promise<NewSessionResponse> {
     return this.conn.newSession({ cwd, mcpServers: [] });
+  }
+
+  /** 历史会话列表（需要 agent 的 listSessions capability；claude adapter 支持） */
+  listSessions(cwd?: string): Promise<ListSessionsResponse> {
+    return this.conn.listSessions(cwd ? { cwd } : {});
+  }
+
+  /** 加载历史会话：历史内容会以 session/update 通知流回放 */
+  loadSession(sessionId: string, cwd: string): Promise<LoadSessionResponse> {
+    return this.conn.loadSession({ sessionId, cwd, mcpServers: [] });
+  }
+
+  /** session/set_config_option：模式/模型/effort 等会话配置 */
+  async setConfigOption(sessionId: string, configId: string, value: string | boolean): Promise<SessionConfigOption[]> {
+    const req = typeof value === 'boolean'
+      ? { sessionId, configId, type: 'boolean' as const, value }
+      : { sessionId, configId, value };
+    const resp = await this.conn.setSessionConfigOption(req);
+    return resp.configOptions;
   }
 
   prompt(sessionId: string, blocks: ContentBlock[]): Promise<PromptResponse> {

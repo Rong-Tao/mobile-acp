@@ -7,6 +7,7 @@ import type {
   ContentBlock,
   PlanEntry,
   RequestPermissionRequest,
+  SessionConfigOption,
   SessionNotification,
   ToolCallStatus,
   ToolKind,
@@ -49,6 +50,8 @@ export interface SessionState {
   entries: ThreadEntry[];
   plan: PlanEntry[] | null;
   currentModeId: string | null;
+  /** session/set_config_option 可调的配置（mode/model/effort…），agent 不支持则为空 */
+  configOptions: SessionConfigOption[];
   availableCommands: AvailableCommand[];
   pendingPermission: PendingPermission | null;
   /** 一个 prompt turn 进行中 */
@@ -62,12 +65,15 @@ export class SessionStore {
     entries: [],
     plan: null,
     currentModeId: null,
+    configOptions: [],
     availableCommands: [],
     pendingPermission: null,
     busy: false,
   };
   private listeners = new Set<Listener>();
   private toolCallIndex = new Map<string, number>();
+  /** session/load 回放中：user_message_chunk 需要入列（平时是本地回显，忽略） */
+  replaying = false;
 
   getState(): SessionState {
     return this.state;
@@ -99,6 +105,31 @@ export class SessionStore {
     this.emit();
   }
 
+  /** newSession/loadSession/set_config_option 的返回值直接灌入 */
+  setConfigOptions(opts: SessionConfigOption[]) {
+    this.state.configOptions = opts;
+    const mode = opts.find((o) => o.category === 'mode' && o.type === 'select');
+    if (mode && mode.type === 'select') this.state.currentModeId = mode.currentValue;
+    this.emit();
+  }
+
+  /** 乐观更新：选完立即反映在 UI，等 agent 的 config_option_update 校正 */
+  setConfigValueLocal(configId: string, value: string | boolean) {
+    this.state.configOptions = this.state.configOptions.map((o) =>
+      o.id === configId ? ({ ...o, currentValue: value } as SessionConfigOption) : o,
+    );
+    const opt = this.state.configOptions.find((o) => o.id === configId);
+    if (opt?.category === 'mode' && typeof value === 'string') this.state.currentModeId = value;
+    this.emit();
+  }
+
+  /** mode 走 current_mode_update 时，把 config option 里的 mode 同步过来 */
+  private syncModeConfig(modeId: string) {
+    this.state.configOptions = this.state.configOptions.map((o) =>
+      o.category === 'mode' && o.type === 'select' ? { ...o, currentValue: modeId } : o,
+    );
+  }
+
   /** turn 被取消时，把进行中的 tool call 标记失败态以外的处理交给后续 update */
   markCancelled() {
     for (const e of this.state.entries) {
@@ -113,7 +144,12 @@ export class SessionStore {
     const u = n.update;
     switch (u.sessionUpdate) {
       case 'user_message_chunk':
-        // 客户端发出的内容回显——本地已渲染，忽略
+        // 平时是客户端发出内容的回显（本地已渲染）忽略；回放时需要真正入列
+        if (this.replaying) {
+          const last = this.state.entries[this.state.entries.length - 1];
+          if (last && last.type === 'user_message') last.blocks.push(u.content);
+          else this.state.entries.push({ type: 'user_message', blocks: [u.content] });
+        }
         break;
       case 'agent_message_chunk':
         this.appendText('assistant_message', u.content);
@@ -165,12 +201,16 @@ export class SessionStore {
         break;
       case 'current_mode_update':
         this.state.currentModeId = u.currentModeId;
+        this.syncModeConfig(u.currentModeId);
+        break;
+      case 'config_option_update':
+        this.state.configOptions = u.configOptions;
         break;
       case 'available_commands_update':
         this.state.availableCommands = u.availableCommands;
         break;
       default:
-        // config_option_update / session_info_update / usage_update —— Phase 5
+        // session_info_update / usage_update —— Phase 5
         break;
     }
     this.emit();

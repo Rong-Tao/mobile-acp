@@ -10,7 +10,7 @@ import { InlineMd, ToolCard, Bubble } from '../components/AgentBits';
 import type { Message } from '../data/types';
 import { LiveSession, useSessionState } from '../core/live';
 import type { PendingPermission, ThreadEntry, ToolCallEntry } from '../core/acp/session-store';
-import type { PlanEntry } from '@agentclientprotocol/sdk';
+import type { PlanEntry, SessionConfigOption, SessionConfigSelectOption } from '@agentclientprotocol/sdk';
 
 const T = THEME;
 
@@ -155,11 +155,28 @@ function ThoughtBlock({ text }: { text: string }) {
   );
 }
 
+// ── 会话配置 chips（mode/model/effort…）─────────────────────────
+const CATEGORY_ICON: Record<string, string> = {
+  mode: 'shield', model: 'chip', thought_level: 'spark',
+};
+
+function flatOptions(opt: SessionConfigOption): SessionConfigSelectOption[] {
+  if (opt.type !== 'select') return [];
+  return opt.options.flatMap((o) => ('group' in o ? o.options : [o]));
+}
+
+function optionLabel(opt: SessionConfigOption): string {
+  if (opt.type === 'boolean') return opt.name;
+  const cur = flatOptions(opt).find((o) => o.value === opt.currentValue);
+  return cur?.name ?? String(opt.currentValue);
+}
+
 // ── Live Agent Tab ────────────────────────────────────────────
 export function LiveAgentTab({ session, accent }: { session: LiveSession; accent: AccentType }) {
   const state = useSessionState(session);
   const [input, setInput] = useState('');
-  const [modePicker, setModePicker] = useState(false);
+  // 打开中的配置选单：configOption 的 id，或 'legacy-mode'（没有 configOptions 的 agent）
+  const [picker, setPicker] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -173,8 +190,11 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
     session.send(text).catch((err) => console.warn('[prompt]', err));
   };
 
+  // configOptions 优先（claude adapter：mode/model/effort）；没有时退回 legacy modes
+  const selectOpts = state.configOptions.filter((o) => o.type === 'select');
   const modes = session.modes;
   const currentMode = modes?.availableModes.find((m) => m.id === (state.currentModeId ?? modes.currentModeId));
+  const pickerOpt = picker != null ? selectOpts.find((o) => o.id === picker) ?? null : null;
 
   const renderEntry = (e: ThreadEntry, i: number) => {
     if (e.type === 'user_message') {
@@ -233,16 +253,28 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
             />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 6, marginTop: 4 }}>
-            {modes && (
-              <Press onPress={() => setModePicker(true)} style={{
-                flexDirection: 'row', alignItems: 'center', gap: 5, height: 30, paddingHorizontal: 9, borderRadius: 9,
-                backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border,
-              }}>
-                <Icon name="shield" size={13} color={T.tx1} />
-                <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 12, color: T.tx1 }}>{currentMode?.name ?? '…'}</Text>
-                <Icon name="chevD" size={12} color={T.tx2} />
-              </Press>
-            )}
+            {/* 配置 chips：busy 时也可以切（mode/model/effort 对下一步立即生效） */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={{ gap: 7 }}>
+              {selectOpts.length > 0 ? selectOpts.map((o) => (
+                <Press key={o.id} onPress={() => setPicker(o.id)} style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 5, height: 30, paddingHorizontal: 9, borderRadius: 9,
+                  backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border,
+                }}>
+                  <Icon name={CATEGORY_ICON[o.category ?? ''] ?? 'settings'} size={13} color={T.tx1} />
+                  <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 12, color: T.tx1 }}>{optionLabel(o)}</Text>
+                  <Icon name="chevD" size={12} color={T.tx2} />
+                </Press>
+              )) : modes && (
+                <Press onPress={() => setPicker('legacy-mode')} style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 5, height: 30, paddingHorizontal: 9, borderRadius: 9,
+                  backgroundColor: T.bg3, borderWidth: 1, borderColor: T.border,
+                }}>
+                  <Icon name="shield" size={13} color={T.tx1} />
+                  <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 12, color: T.tx1 }}>{currentMode?.name ?? '…'}</Text>
+                  <Icon name="chevD" size={12} color={T.tx2} />
+                </Press>
+              )}
+            </ScrollView>
             <View style={{ flex: 1 }} />
             {state.busy ? (
               <Press onPress={() => session.cancel()} style={{
@@ -263,9 +295,33 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
         </View>
       </View>
 
-      {/* mode picker（session/set_mode） */}
-      <Sheet open={modePicker} onClose={() => setModePicker(false)}>
-        {modes && (
+      {/* 配置选单（session/set_config_option；legacy agent 走 session/set_mode） */}
+      <Sheet open={picker != null} onClose={() => setPicker(null)}>
+        {pickerOpt ? (
+          <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 12 }}>
+              <Icon name={CATEGORY_ICON[pickerOpt.category ?? ''] ?? 'settings'} size={19} color={accent.hue} />
+              <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15, color: T.tx0 }}>{pickerOpt.name}</Text>
+            </View>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {flatOptions(pickerOpt).map((m) => {
+                const on = m.value === pickerOpt.currentValue;
+                return (
+                  <Press key={m.value} onPress={() => { session.setConfig(pickerOpt.id, m.value).catch((e) => console.warn('[setConfig]', e)); setPicker(null); }} style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, marginBottom: 2,
+                    backgroundColor: on ? accent.dim : 'transparent', borderWidth: 1, borderColor: on ? accent.hue + '44' : 'transparent',
+                  }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14.5, color: T.tx0 }}>{m.name}</Text>
+                      {!!m.description && <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, marginTop: 2 }}>{m.description}</Text>}
+                    </View>
+                    {on && <Icon name="check" size={19} color={accent.hue} />}
+                  </Press>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : picker === 'legacy-mode' && modes ? (
           <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 12 }}>
               <Icon name="shield" size={19} color={accent.hue} />
@@ -274,7 +330,7 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
             {modes.availableModes.map((m) => {
               const on = m.id === (state.currentModeId ?? modes.currentModeId);
               return (
-                <Press key={m.id} onPress={() => { session.setMode(m.id); setModePicker(false); }} style={{
+                <Press key={m.id} onPress={() => { session.setMode(m.id).catch((e) => console.warn('[setMode]', e)); setPicker(null); }} style={{
                   flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, marginBottom: 2,
                   backgroundColor: on ? accent.dim : 'transparent', borderWidth: 1, borderColor: on ? accent.hue + '44' : 'transparent',
                 }}>
@@ -287,7 +343,7 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
               );
             })}
           </View>
-        )}
+        ) : null}
       </Sheet>
     </KeyboardAvoidingView>
   );

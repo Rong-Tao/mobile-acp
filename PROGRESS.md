@@ -2,6 +2,28 @@
 
 > 本地调试细节(私有服务器、测试链路搭建)见 `NOTES.local.md`(gitignored,不入库)。
 
+## 未发布(working tree)— 2026-10-09
+
+**Agent/Thread 分层 + 会话配置:**
+- 核心重构:`LiveAgent`(一个 agent 进程)与 `LiveSession`(其上的一个 thread/ACP session)分层;
+  通知/权限请求按 sessionId 路由到各自 SessionStore,多 thread 互不干扰
+- **Threads 独立 tab**(Agent | Threads | Files | Git 四栏):`session/list` 按当前 project cwd 过滤,
+  标题+相对时间+当前高亮;点历史 thread 走 `session/load` 全量回放并跳回 Agent;New thread 在面板顶部,
+  header 的 "+" 也可快捷新建;agent 进程全程不重启
+- **自动续上最近 thread**:lastThreadId 持久化,重进项目/app 冷启动直接恢复上次聊天(失败则静默新开)
+- **Mode/Model/Effort chips**(composer 左下):来自 ACP `configOptions`(claude adapter 提供
+  mode/model/effort 三个 select),通用选单渲染,`session/set_config_option` 生效;
+  busy 时同样可切;没有 configOptions 的 agent(gemini/codex)退回 legacy mode picker
+- **配置持久化**:按 (agent, project) 存 AsyncStorage(`src/core/agent-prefs.ts`),
+  新 thread/app 重启自动恢复;历史 thread 保留它自己存的配置不被覆盖
+- 验证:tsc ✓,remote/polyfill 9 测试 ✓,原 UI 冒烟 15/15 ✓,新冒烟 8/8
+  (4 tabs/chips/面板列表/回放跳转/冷启动续上/新 thread 恢复 prefs);截图在 `uitest/shots/`(gitignored);
+  e2e 仍是已知的 2 例 OAuth 环境失败
+- **真实 SSH 验证**(远端测试服务器):`test/gcp-acp.manual.test.ts` 扩充 thread 全生命周期——
+  新建→真实 prompt→session/list 含新 thread→开第二个 thread(store 隔离)→切回(内存复用)→
+  杀进程重连后 session/load 冷回放,2/2 过;UI 版冒烟(exec/agent 跑在远端,`uitest/gcp-threads.mjs`)
+  4/4 过:真实对话→Threads 面板列出远端历史→切历史 thread 回放→列表刷新 Current 正确
+
 ## v0.1.13 – v0.1.17 — 2026-10-09
 
 **真机/真实服务器联调中修掉的 5 个 bug:**
