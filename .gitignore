@@ -4,3 +4,7 @@ dist/
 *.log
 .DS_Store
 mobile-acp.zip
+
+# 本地私有文档/脚本(含服务器信息,禁止入库)
+NOTES.local.md
+uitest/

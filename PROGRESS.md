@@ -1,5 +1,36 @@
 # Development Progress
 
+> 本地调试细节(私有服务器、测试链路搭建)见 `NOTES.local.md`(gitignored,不入库)。
+
+## v0.1.13 – v0.1.17 — 2026-10-09
+
+**真机/真实服务器联调中修掉的 5 个 bug:**
+
+| 版本 | 修复 |
+|---|---|
+| v0.1.13 | ServerDetail 无限渲染循环导致整屏卡死(exec 每次渲染新引用,effect 依赖它反复触发);Scan repos 按钮被两个 `full` 宽度按钮挤出屏幕 |
+| v0.1.14 | `loadCredential` 在无 SecureStore 的平台 throw,连接被误判 Offline、MainShell 卡 loading |
+| v0.1.15 | **Hermes 没有 Web Streams API**,ACP 客户端一启动就 `ReferenceError: ReadableStream`——入口注入 polyfill(`src/polyfills.ts`);Files/Git 的 exec 与 agent 会话解耦(agent 挂了文件系统和 git 照常可用);远端路径从 `JSON.stringify` 换成 `shq()`(双引号内 `~` 不展开、`$`/反引号会被 shell 展开) |
+| v0.1.16 | Agents 探测补用户级 bin PATH(非交互 SSH 看不到 `~/.local/bin` 的 claude);ssh-live 测试套件主机无关化 |
+| v0.1.17 | AgentBits 丢 `useState` import,Agent 页**首条消息渲染必崩** |
+
+**测试体系(全部真实,无 mock):**
+- `test/remote.test.ts`:核心远端函数过 bridge(真实 shell/git,含怪路径转义)
+- `test/polyfill.test.ts`:删掉 stream 全局模拟 Hermes,验证 polyfill 撑起 ACP 管道
+- `test/ssh-live.manual.test.ts`:只读套件过真实 SSH,`SSH_TEST_HOST=<host>` 任意主机
+- `test/gcp-acp.manual.test.ts`:app 的 LiveSession/AgentClient 过真实 SSH 完成 ACP 握手
+- UI 冒烟:web build(与手机同一份组件)+ headless Chrome 手机视口 + bridge 真实 exec,
+  全流程点击验证(扫仓库→加项目→Files→Git diff/commit→Agent 对话→权限弹窗→工具落盘)。
+  **两个真机 crash(v0.1.13/v0.1.17)都是这层抓到的,改 UI 后发版前必跑。**
+
+**端到端已验证**(真实远端服务器 + 手机仿真):连接、扫描/添加项目、文件树与预览、
+git 状态/diff/真实 commit、agent 对话(流式回答、自主调工具、权限弹窗批准、文件真实写入)。
+
+**下一步:**
+- [ ] 会话持久化:spawn 套 tmux + sessionId 持久化 + 重连 `session/load`(adapter 已支持 loadSession)
+- [ ] SSH keepalive / 断线自动重连(目前手动 Retry)
+- [ ] thread 列表(session/list)
+
 ## v0.1.12 — 2026-10-09
 
 **去 mock 化：所有界面接真实数据**
