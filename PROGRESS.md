@@ -2,7 +2,19 @@
 
 > 本地调试细节(私有服务器、测试链路搭建)见 `NOTES.local.md`(gitignored,不入库)。
 
-## 未发布(working tree)— 2026-10-09 (第四批)
+## 未发布(working tree)— 2026-10-09 (第五批)
+
+**New thread 选择器 + Terminal thread:**
+- New thread(header "+" 和 Threads 面板)先弹选择器:Claude Code / Codex / Gemini / **Terminal**;
+  选别的 agent = 切 agent 并直接开新 thread(requestFreshThread 跳过 resume)
+- **Terminal**(`core/terminal.ts` + `tabs/TerminalTab.tsx`):transport.spawn 跑远端
+  `bash --noediting -i`(无 bash 退 sh),线性终端——命令/输出流式,本地回显,剥 ANSI,
+  buffer 200k 封顶;无 PTY,vim/htop 等全屏交互暂不支持;shell 退出可一键重启
+- Threads 面板常驻 Terminal 行(当前时标 Current);终端与 agent thread 互切 buffer 不丢;
+  连接重建后终端随之作废、下次打开重 spawn
+- 冒烟 `uitest/terminal.mjs` 8/8(真实 shell:echo 算术/pwd/切换保留);threads2 9/9
+
+## 2026-10-09 (第四批,已发 v0.1.22)
 
 **连接层对齐 Zed + SSH/agent 状态分离:**
 - 心跳参数照搬 Zed remote_client:5s 间隔/5s 超时/**连续 5 次 miss 才判死**;

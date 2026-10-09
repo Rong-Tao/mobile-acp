@@ -4,13 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEME, AccentType } from '../theme';
 import type { Server, Project } from '../data/types';
 import { Icon } from '../components/Icon';
-import { Press, Spinner, Btn } from '../components/Primitives';
+import { Press, Spinner, Sheet, Btn } from '../components/Primitives';
 import { LiveAgentTab } from '../tabs/LiveAgentTab';
 import { FilesTab } from '../tabs/FilesTab';
 import { GitTab } from '../tabs/GitTab';
 import { ThreadsTab } from '../tabs/ThreadsTab';
+import { TerminalTab } from '../tabs/TerminalTab';
 import { LiveProvider, SshLiveProvider, useLive, type LiveStatus } from '../core/live-context';
-import { useSessionState } from '../core/live';
+import { useSessionState, requestFreshThread } from '../core/live';
 import { loadCredential } from '../core/credentials';
 import type { SshConfig } from '../core/ssh-transport';
 
@@ -68,15 +69,15 @@ function sshLabel(status: LiveStatus): { text: string; color: string } {
   return { text: 'connected', color: T.green };
 }
 
-function ContextHeader({ tab, accent, status, busy, hasSession, onStatusTap, curAgent, onNewThread, serverName, projectName }:
-  { tab: TabId; accent: AccentType; status: LiveStatus; busy: boolean; hasSession: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
+function ContextHeader({ tab, accent, status, busy, hasSession, terminalView, onStatusTap, curAgent, onNewThread, serverName, projectName }:
+  { tab: TabId; accent: AccentType; status: LiveStatus; busy: boolean; hasSession: boolean; terminalView: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
 
   const avatar = tab === 'agent'
-    ? { icon: curAgent.icon, tint: curAgent.tint }
+    ? (terminalView ? { icon: 'terminal', tint: T.green } : { icon: curAgent.icon, tint: curAgent.tint })
     : tab === 'threads' ? { icon: 'thread', tint: curAgent.tint }
     : tab === 'files' ? { icon: 'folder', tint: accent.hue } : { icon: 'branch', tint: accent.hue };
 
-  const title = tab === 'agent' ? curAgent.name : tab === 'threads' ? 'Threads' : projectName;
+  const title = tab === 'agent' ? (terminalView ? 'Terminal' : curAgent.name) : tab === 'threads' ? 'Threads' : projectName;
   const sub = tab === 'agent' || tab === 'threads' ? `${projectName} · ${serverName}` : `${serverName} · ${projectName}`;
   const st = sshLabel(status);
   const stuck = status === 'error' || status === 'off';
@@ -165,7 +166,28 @@ type InnerProps = MainShellProps & {
 function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent }: InnerProps) {
   const live = useLive();
   const [tab, setTabRaw] = useState<TabId>('agent');
+  // agent 区当前显示的内容：thread 对话 or 终端
+  const [view, setView] = useState<'thread' | 'terminal'>('thread');
+  const [chooser, setChooser] = useState(false); // New thread 选择器(agents + Terminal)
   const sessionState = useSessionState(live.session);
+
+  const pickAgent = (a: typeof AGENT_CHOICES[0]) => {
+    setChooser(false);
+    setView('thread');
+    setTabRaw('agent');
+    if (a.id === curAgent.id) {
+      live.newThread().catch(() => {});
+    } else {
+      requestFreshThread();  // 换 agent 重建连接后直接开新 thread,不 resume 旧的
+      onPickAgent(a);
+    }
+  };
+
+  const openTerminal = () => {
+    setChooser(false);
+    setTabRaw('agent');
+    live.openTerminal().then((t) => { if (t) setView('terminal'); }).catch(() => {});
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg0 }}>
@@ -177,9 +199,10 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
           status={live.status}
           busy={sessionState.busy}
           hasSession={!!live.session}
+          terminalView={view === 'terminal'}
           onStatusTap={live.reconnect}
           curAgent={curAgent}
-          onNewThread={() => { live.newThread().catch(() => {}); }}
+          onNewThread={() => setChooser(true)}
           serverName={server.name}
           projectName={project.name}
         />
@@ -187,23 +210,61 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
 
       <View style={{ flex: 1 }}>
         {tab === 'agent' && (
-          live.threadLoading
-            ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <Spinner size={22} color={accent.hue} />
-                <Text style={{ fontFamily: T.uiFontMedium, fontSize: 13.5, color: T.tx1 }}>Opening thread…</Text>
-              </View>
-            : live.session
-              ? <LiveAgentTab key={live.session.sessionId} session={live.session} accent={accent} />
-              : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={live.reconnect} />
+          view === 'terminal' && live.terminal
+            ? <TerminalTab term={live.terminal} accent={accent} />
+            : live.threadLoading
+              ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                  <Spinner size={22} color={accent.hue} />
+                  <Text style={{ fontFamily: T.uiFontMedium, fontSize: 13.5, color: T.tx1 }}>Opening thread…</Text>
+                </View>
+              : live.session
+                ? <LiveAgentTab key={live.session.sessionId} session={live.session} accent={accent} />
+                : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={live.reconnect} />
         )}
         {tab === 'threads' && (
-          <ThreadsTab accent={accent} onOpened={() => setTabRaw('agent')}
-            agents={AGENT_CHOICES} curAgentId={curAgent.id}
-            onPickAgent={(id) => { const a = AGENT_CHOICES.find(x => x.id === id); if (a) onPickAgent(a); }} />
+          <ThreadsTab accent={accent}
+            onOpened={() => { setView('thread'); setTabRaw('agent'); }}
+            onNewThread={() => setChooser(true)}
+            terminalOpen={!!live.terminal && view === 'terminal'}
+            onOpenTerminal={openTerminal} />
         )}
         {tab === 'files' && <FilesTab accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
         {tab === 'git'   && <GitTab   accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
       </View>
+
+      {/* New thread 选择器：从可用 agent 里挑,或开 Terminal */}
+      <Sheet open={chooser} onClose={() => setChooser(false)}>
+        <View style={{ paddingHorizontal: 12, paddingBottom: 14 }}>
+          <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15, color: T.tx0, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 10 }}>New thread</Text>
+          {AGENT_CHOICES.map(a => (
+            <Press key={a.id} onPress={() => pickAgent(a)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 8, borderRadius: 12 }}>
+              <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: a.tint + '22', borderWidth: 1, borderColor: a.tint + '44', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={a.icon} size={19} color={a.tint} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14.5, color: T.tx0 }}>{a.name}</Text>
+                <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.tx2 }} numberOfLines={1}>
+                  {a.id === curAgent.id ? 'new thread' : 'switches agent · new thread'}
+                </Text>
+              </View>
+              <Icon name="chevR" size={16} color={T.tx2} />
+            </Press>
+          ))}
+          <View style={{ height: 1, backgroundColor: T.borderSoft, marginVertical: 6, marginHorizontal: 8 }} />
+          <Press onPress={openTerminal}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 8, borderRadius: 12 }}>
+            <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: T.green + '22', borderWidth: 1, borderColor: T.green + '44', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="terminal" size={19} color={T.green} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14.5, color: T.tx0 }}>Terminal</Text>
+              <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.tx2 }} numberOfLines={1}>shell in {project.name}</Text>
+            </View>
+            <Icon name="chevR" size={16} color={T.tx2} />
+          </Press>
+        </View>
+      </Sheet>
     </View>
   );
 }

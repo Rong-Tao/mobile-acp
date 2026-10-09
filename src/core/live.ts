@@ -11,6 +11,16 @@ import { loadAgentPrefs, saveAgentPref } from './agent-prefs';
 import { persistentSpawnCmd } from './persist';
 import type { Transport } from './transport';
 
+// "换个 agent 并直接开新 thread"：provider 重建前置个一次性标记，
+// 重连后的 resumeOrNewThread 消费它（否则会 resume 那个 agent 的上一个 thread）
+let freshThreadRequested = false;
+export function requestFreshThread(): void { freshThreadRequested = true; }
+function consumeFreshThreadRequest(): boolean {
+  const v = freshThreadRequested;
+  freshThreadRequested = false;
+  return v;
+}
+
 export interface LiveAgentOptions {
   transport: Transport;
   /** agent 启动命令 */
@@ -176,6 +186,7 @@ export class LiveAgent {
 
   /** 连接后恢复最近打开的 thread；没有或加载失败则新开 */
   async resumeOrNewThread(): Promise<LiveSession> {
+    if (consumeFreshThreadRequest()) return this.newThread();
     if (this.supportsThreadList) {
       try {
         const prefs = await loadAgentPrefs(this.opts.agentId ?? 'agent', this.cwd);

@@ -23,15 +23,13 @@ function relTime(iso?: string | null): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-type AgentChoice = { id: string; name: string; icon: string; tint: string };
-
-export function ThreadsTab({ accent, onOpened, agents, curAgentId, onPickAgent }: {
+export function ThreadsTab({ accent, onOpened, onNewThread, terminalOpen, onOpenTerminal }: {
   accent: AccentType;
   onOpened: () => void;
-  /** 可选 agent（新 thread 用；切换会重启 agent 进程连接） */
-  agents?: AgentChoice[];
-  curAgentId?: string;
-  onPickAgent?: (id: string) => void;
+  /** 打开 New thread 选择器(agents + Terminal) */
+  onNewThread: () => void;
+  terminalOpen?: boolean;
+  onOpenTerminal?: () => void;
 }) {
   const live = useLive();
   const [refreshing, setRefreshing] = useState(false);
@@ -54,31 +52,29 @@ export function ThreadsTab({ accent, onOpened, agents, curAgentId, onPickAgent }
       contentContainerStyle={{ padding: 12, paddingTop: 14 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={accent.hue} />}
     >
-      {/* 新建 */}
+      {/* 新建：打开选择器(从可用 agent 里挑,或 Terminal) */}
       <Press
-        onPress={() => { live.newThread().then(onOpened).catch(() => {}); }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 12, borderRadius: 13, backgroundColor: accent.dim, borderWidth: 1, borderColor: accent.hue + '33', marginBottom: 10 }}
+        onPress={onNewThread}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 12, borderRadius: 13, backgroundColor: accent.dim, borderWidth: 1, borderColor: accent.hue + '33', marginBottom: 8 }}
       >
         <Icon name="plus" size={18} color={accent.hue} />
-        <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.hue }}>New thread</Text>
+        <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.hue, flex: 1 }}>New thread</Text>
+        <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2 }}>agent / terminal</Text>
       </Press>
 
-      {/* agent 选择（原 header 小三角挪到这里；一个 thread 的 agent 定了就不换） */}
-      {agents && agents.length > 1 && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, paddingHorizontal: 2 }}>
-          <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2, marginRight: 2 }}>Agent</Text>
-          {agents.map((a) => {
-            const on = a.id === curAgentId;
-            return (
-              <Press key={a.id} onPress={() => { if (!on) onPickAgent?.(a.id); }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 9, borderRadius: 9,
-                  backgroundColor: on ? a.tint + '22' : T.bg2, borderWidth: 1, borderColor: on ? a.tint + '66' : T.border }}>
-                <Icon name={a.icon} size={12} color={on ? a.tint : T.tx2} />
-                <Text style={{ fontFamily: on ? T.uiFontSemiBold : T.uiFontMedium, fontSize: 11.5, color: on ? T.tx0 : T.tx2 }}>{a.name}</Text>
-              </Press>
-            );
-          })}
-        </View>
+      {/* 终端入口：常驻一行,点了直接进(没开过就现开) */}
+      {onOpenTerminal && (
+        <Press
+          onPress={onOpenTerminal}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11, paddingHorizontal: 11, borderRadius: 13, marginBottom: 14,
+            backgroundColor: terminalOpen ? T.green + '14' : 'transparent', borderWidth: 1, borderColor: terminalOpen ? T.green + '44' : T.border }}
+        >
+          <Icon name="terminal" size={16} color={T.green} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontFamily: T.uiFontMedium, fontSize: 13.5, color: T.tx0 }}>Terminal</Text>
+            {terminalOpen && <Text style={{ fontFamily: T.uiFont, fontSize: 11, color: T.green, marginTop: 1 }}>Current</Text>}
+          </View>
+        </Press>
       )}
 
       {!live.threadsSupported ? (

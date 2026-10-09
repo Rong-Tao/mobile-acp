@@ -20,6 +20,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState } from 'react-native';
 import type { SessionInfo } from '@agentclientprotocol/sdk';
 import { LiveAgent, LiveSession } from './live';
+import { TerminalSession } from './terminal';
 import { notifyIfBackground } from './notify';
 import { WsTransport } from './ws-transport';
 import { SshTransport, type SshConfig } from './ssh-transport';
@@ -63,6 +64,9 @@ interface LiveCtxValue {
   refreshThreads: () => Promise<void>;
   /** 手动重连（重置尝试计数；UI 的 Retry / 点状态文字走这里） */
   reconnect: () => void;
+  /** project 目录里的远端终端（懒创建，随连接存亡） */
+  terminal: TerminalSession | null;
+  openTerminal: () => Promise<TerminalSession | null>;
 }
 
 const NOOP = async () => {};
@@ -71,6 +75,7 @@ const EMPTY_CTX: LiveCtxValue = {
   threads: [], threadsSupported: false, threadLoading: false,
   newThread: NOOP, openThread: NOOP as (id: string) => Promise<void>, refreshThreads: NOOP,
   reconnect: () => {},
+  terminal: null, openTerminal: async () => null,
 };
 
 const LiveCtx = createContext<LiveCtxValue>(EMPTY_CTX);
@@ -99,9 +104,11 @@ function useLiveValue(
   const [threads, setThreads] = useState<SessionInfo[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [tick, setTick] = useState(0); // bump = 重建连接（一次重连尝试）
+  const [terminal, setTerminal] = useState<TerminalSession | null>(null);
   const ref = useRef<{
     live?: LiveAgent; transport?: Transport; dead?: boolean;
     retry?: ReturnType<typeof setTimeout>;
+    terminal?: TerminalSession;
     attempts: number;          // 连续失败的重连次数（跨 effect 重建存活）
     lastActivity: number;      // 最近一次收到流量/心跳成功的时刻
   }>({ attempts: 0, lastActivity: 0 });
@@ -116,6 +123,24 @@ function useLiveValue(
     if (ref.current.retry) clearTimeout(ref.current.retry);
     setTick((t) => t + 1);
   }, []);
+
+  const openTerminal = useCallback(async (): Promise<TerminalSession | null> => {
+    const state = ref.current;
+    if (state.terminal && !state.terminal.exited) return state.terminal;
+    const transport = state.transport;
+    if (!transport) return null;
+    const term = new TerminalSession(transport, state.live?.cwd ?? cwd);
+    try {
+      await term.start();
+    } catch (err) {
+      console.warn('[terminal] start failed', err);
+      return null;
+    }
+    state.terminal = term;
+    if (!state.dead) setTerminal(term);
+    return term;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cwd]);
 
   const refreshThreads = useCallback(async () => {
     const live = ref.current.live;
@@ -161,6 +186,8 @@ function useLiveValue(
     state.dead = false;
     setStatus(() => ({ session: null, status: 'connecting', error: null, exec: null }));
     setThreads([]);
+    setTerminal(null); // 终端随旧连接作废,下次打开重新 spawn
+    state.terminal = undefined;
 
     const touch = () => { state.lastActivity = Date.now(); };
 
@@ -252,6 +279,7 @@ function useLiveValue(
       state.dead = true;
       if (heartbeat) clearInterval(heartbeat);
       if (state.retry) clearTimeout(state.retry);
+      state.terminal?.kill();
       state.live?.dispose();
       state.transport?.close();
       state.live = undefined;
@@ -288,6 +316,8 @@ function useLiveValue(
     openThread,
     refreshThreads,
     reconnect,
+    terminal,
+    openTerminal,
   };
 }
 
