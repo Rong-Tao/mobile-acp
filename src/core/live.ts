@@ -23,6 +23,8 @@ export interface LiveAgentOptions {
   persist?: boolean;
   /** app 在后台时的提醒回调（turn 完成 / 待权限），由 UI 层注入 */
   notify?: (title: string, body?: string) => void;
+  /** 收到任何 agent 流量时回调——连接层拿它当心跳（有流量就不用 ping） */
+  onActivity?: () => void;
   env?: Record<string, string>;
 }
 
@@ -114,7 +116,10 @@ export class LiveAgent {
       env: opts.env,
       handlers: {
         // 多 thread：一切通知/请求按 sessionId 路由到对应 store
-        onSessionUpdate: (n) => live.threads.get(n.sessionId)?.store.apply(n),
+        onSessionUpdate: (n) => {
+          opts.onActivity?.();
+          live.threads.get(n.sessionId)?.store.apply(n);
+        },
         onPermissionRequest: (req) =>
           new Promise((resolve) => {
             const store = live.threads.get(req.sessionId)?.store;

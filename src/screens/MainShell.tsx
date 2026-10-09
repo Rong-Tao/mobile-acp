@@ -56,19 +56,20 @@ function TopTabs({ tab, setTab, accent, onBack }: { tab: TabId; setTab: (t: TabI
 }
 
 // ── Context Header ────────────────────────────────────────────
-// 真实状态文字（取代以前会说谎的小绿点）：
-// initing = 建连/起 agent;working = turn 进行中;connected = 空闲在线;
-// reconnecting = 心跳判死后自动重连中;lost connection = 连接失败(点击立即重试)
-function statusLabel(status: LiveStatus, busy: boolean): { text: string; color: string } {
+// SSH 连接状态（彩色文字，对齐 Zed 的状态机）：
+// initing = 建连/起 agent;connected = 在线;unstable = 心跳 miss(HeartbeatMissed);
+// reconnecting = 自动重连中;lost connection = 重连用尽(点击重试)。
+// agent 的 working/idle 是另一回事,独立显示在 header 居中的 chip 里。
+function sshLabel(status: LiveStatus): { text: string; color: string } {
   if (status === 'connecting') return { text: 'initing…', color: T.yellow };
+  if (status === 'degraded') return { text: 'unstable', color: T.yellow };
   if (status === 'lost') return { text: 'reconnecting…', color: T.yellow };
   if (status === 'error' || status === 'off') return { text: 'lost connection', color: T.red };
-  if (busy) return { text: 'working', color: T.cyan };
   return { text: 'connected', color: T.green };
 }
 
-function ContextHeader({ tab, accent, status, busy, onStatusTap, curAgent, onNewThread, serverName, projectName }:
-  { tab: TabId; accent: AccentType; status: LiveStatus; busy: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
+function ContextHeader({ tab, accent, status, busy, hasSession, onStatusTap, curAgent, onNewThread, serverName, projectName }:
+  { tab: TabId; accent: AccentType; status: LiveStatus; busy: boolean; hasSession: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
 
   const avatar = tab === 'agent'
     ? { icon: curAgent.icon, tint: curAgent.tint }
@@ -77,22 +78,37 @@ function ContextHeader({ tab, accent, status, busy, onStatusTap, curAgent, onNew
 
   const title = tab === 'agent' ? curAgent.name : tab === 'threads' ? 'Threads' : projectName;
   const sub = tab === 'agent' || tab === 'threads' ? `${projectName} · ${serverName}` : `${serverName} · ${projectName}`;
-  const st = statusLabel(status, busy);
-  const stuck = status === 'error' || status === 'off' || status === 'lost';
+  const st = sshLabel(status);
+  const stuck = status === 'error' || status === 'off';
+  const showAgentChip = (tab === 'agent' || tab === 'threads') && hasSession;
 
   return (
     <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingRight: 8, backgroundColor: T.bg1, borderBottomWidth: 1, borderColor: T.borderSoft }}>
       <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: avatar.tint + '22', borderWidth: 1, borderColor: avatar.tint + '44', alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={avatar.icon} size={17} color={avatar.tint} />
       </View>
-      <Press onPress={stuck ? onStatusTap : undefined} style={{ flex: 1, minWidth: 0 }}>
+      <Press onPress={stuck ? onStatusTap : undefined} style={{ flexShrink: 1, minWidth: 0 }}>
         <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15, color: T.tx0, letterSpacing: -0.01 * 15 }} numberOfLines={1}>{title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
-          {busy && status === 'on' && <Spinner size={9} color={st.color} />}
           <Text style={{ fontFamily: T.monoFontMedium, fontSize: 11, color: st.color }}>{st.text}</Text>
           <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2, flexShrink: 1 }} numberOfLines={1}>· {sub}</Text>
         </View>
       </Press>
+      {/* agent 状态 chip：working/idle,与 SSH 状态无关,占据中间剩余空间居中 */}
+      <View style={{ flex: 1, alignItems: 'center' }}>
+        {showAgentChip && (
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 5, height: 24, paddingHorizontal: 10, borderRadius: 12,
+            backgroundColor: busy ? T.cyan + '1a' : T.bg2,
+            borderWidth: 1, borderColor: busy ? T.cyan + '55' : T.borderSoft,
+          }}>
+            {busy && <Spinner size={10} color={T.cyan} />}
+            <Text style={{ fontFamily: T.monoFontMedium, fontSize: 10.5, color: busy ? T.cyan : T.tx2 }}>
+              {busy ? 'working' : 'idle'}
+            </Text>
+          </View>
+        )}
+      </View>
       {tab === 'agent' && (
         <Press onPress={onNewThread} style={{ width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: accent.dim }}>
           <Icon name="plus" size={19} color={accent.hue} />
@@ -160,6 +176,7 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
           accent={accent}
           status={live.status}
           busy={sessionState.busy}
+          hasSession={!!live.session}
           onStatusTap={live.reconnect}
           curAgent={curAgent}
           onNewThread={() => { live.newThread().catch(() => {}); }}

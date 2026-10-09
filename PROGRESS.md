@@ -2,7 +2,19 @@
 
 > 本地调试细节(私有服务器、测试链路搭建)见 `NOTES.local.md`(gitignored,不入库)。
 
-## 未发布(working tree)— 2026-10-09 (第三批)
+## 未发布(working tree)— 2026-10-09 (第四批)
+
+**连接层对齐 Zed + SSH/agent 状态分离:**
+- 心跳参数照搬 Zed remote_client:5s 间隔/5s 超时/**连续 5 次 miss 才判死**;
+  任何 agent 流量都算心跳(近 5s 有流量不发 ping,省电版 #19219)
+- 状态机加 **unstable**(= Zed HeartbeatMissed,第一次 miss 变黄不惊动);
+  自动重连最多 **3 次**(3s 间隔),用尽转红 lost connection 等手动(点状态文字重试)
+- 手机特有:**app 回前台立即探活**,死了马上重连(不等心跳慢慢数)
+- header 分离两种状态:左侧 SSH 状态文字(initing/connected/unstable/reconnecting/lost),
+  居中独立 agent chip(working 青色带 spinner / idle 灰)
+- resilience 冒烟升到 10/10(unstable 阶梯/3 次重连/手动兜底/working→idle)
+
+## 2026-10-09 (第三批,已发 v0.1.21)
 
 **连接健康 + 状态真实化:**
 - **心跳与超时**(live-context):每 15s exec('true') 心跳(10s 超时),所有 exec 带 25s 超时——
