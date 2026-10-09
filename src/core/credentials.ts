@@ -15,9 +15,11 @@ export async function saveCredential(serverId: string, cred: StoredCred): Promis
 }
 
 export async function loadCredential(serverId: string): Promise<StoredCred | null> {
-  const raw = await SecureStore.getItemAsync(key(serverId));
-  if (!raw) return null;
+  // SecureStore 在 web 等平台不可用时会 throw——当作"没有凭证"处理，
+  // 让调用方正常回退到 dev bridge，而不是整条链路报 Offline/卡 loading
   try {
+    const raw = await SecureStore.getItemAsync(key(serverId));
+    if (!raw) return null;
     return JSON.parse(raw) as StoredCred;
   } catch {
     return null;
