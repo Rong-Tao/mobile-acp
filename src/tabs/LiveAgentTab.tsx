@@ -2,7 +2,7 @@
 // 复用 AgentTab 的视觉组件，数据来自 SessionStore 的 ThreadEntry 流。
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Keyboard, Platform } from 'react-native';
 import { THEME, AccentType } from '../theme';
 import { Icon } from '../components/Icon';
 import { Press, Spinner, Sheet } from '../components/Primitives';
@@ -183,6 +183,14 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }, [state.entries.length, state.busy, state.pendingPermission]);
 
+  // 键盘弹出窗口缩小后,把对话滚回底部(不然最后几条被顶出视野)
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    });
+    return () => sub.remove();
+  }, []);
+
   const send = () => {
     const text = input.trim();
     if (!text || state.busy) return;
@@ -212,7 +220,9 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    // Android 用 manifest 的 adjustResize 由系统缩窗口；KAV 的 'height' 会和它
+    // 打架(按原始高度再算一遍,把 composer 顶出屏幕)——Android 必须 undefined
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
