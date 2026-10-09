@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, ReactNode } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Modal, Animated,
+  View, Text, TextInput, TouchableOpacity, Modal, Animated, KeyboardAvoidingView,
   ScrollView, Pressable, StyleSheet, useWindowDimensions,
 } from 'react-native';
 import { THEME, AccentType, accentFor } from '../theme';
@@ -100,8 +100,11 @@ export function Sheet({ open, onClose, children, height = 'auto', pad = true }: 
 
   return (
     <Modal visible={open} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: fadeAnim, justifyContent: 'flex-end' }]}>
+      <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.55)', opacity: fadeAnim }]}>
         <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={onClose} />
+        {/* Modal + statusBarTranslucent 不吃 adjustResize,键盘会盖住弹层里的输入框;
+            padding 模式按"键盘与自身的实际重叠"算,窗口若已被缩则重叠为 0,不会叠加 */}
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
         <Animated.View style={{
           backgroundColor: T.bg1,
           borderTopLeftRadius: 18, borderTopRightRadius: 18,
@@ -121,6 +124,7 @@ export function Sheet({ open, onClose, children, height = 'auto', pad = true }: 
             {children}
           </ScrollView>
         </Animated.View>
+        </KeyboardAvoidingView>
       </Animated.View>
     </Modal>
   );
