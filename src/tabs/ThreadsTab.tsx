@@ -23,7 +23,16 @@ function relTime(iso?: string | null): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-export function ThreadsTab({ accent, onOpened }: { accent: AccentType; onOpened: () => void }) {
+type AgentChoice = { id: string; name: string; icon: string; tint: string };
+
+export function ThreadsTab({ accent, onOpened, agents, curAgentId, onPickAgent }: {
+  accent: AccentType;
+  onOpened: () => void;
+  /** 可选 agent（新 thread 用；切换会重启 agent 进程连接） */
+  agents?: AgentChoice[];
+  curAgentId?: string;
+  onPickAgent?: (id: string) => void;
+}) {
   const live = useLive();
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -48,11 +57,29 @@ export function ThreadsTab({ accent, onOpened }: { accent: AccentType; onOpened:
       {/* 新建 */}
       <Press
         onPress={() => { live.newThread().then(onOpened).catch(() => {}); }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 12, borderRadius: 13, backgroundColor: accent.dim, borderWidth: 1, borderColor: accent.hue + '33', marginBottom: 14 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, paddingHorizontal: 12, borderRadius: 13, backgroundColor: accent.dim, borderWidth: 1, borderColor: accent.hue + '33', marginBottom: 10 }}
       >
         <Icon name="plus" size={18} color={accent.hue} />
         <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14, color: accent.hue }}>New thread</Text>
       </Press>
+
+      {/* agent 选择（原 header 小三角挪到这里；一个 thread 的 agent 定了就不换） */}
+      {agents && agents.length > 1 && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 14, paddingHorizontal: 2 }}>
+          <Text style={{ fontFamily: T.uiFont, fontSize: 11.5, color: T.tx2, marginRight: 2 }}>Agent</Text>
+          {agents.map((a) => {
+            const on = a.id === curAgentId;
+            return (
+              <Press key={a.id} onPress={() => { if (!on) onPickAgent?.(a.id); }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 28, paddingHorizontal: 9, borderRadius: 9,
+                  backgroundColor: on ? a.tint + '22' : T.bg2, borderWidth: 1, borderColor: on ? a.tint + '66' : T.border }}>
+                <Icon name={a.icon} size={12} color={on ? a.tint : T.tx2} />
+                <Text style={{ fontFamily: on ? T.uiFontSemiBold : T.uiFontMedium, fontSize: 11.5, color: on ? T.tx0 : T.tx2 }}>{a.name}</Text>
+              </Press>
+            );
+          })}
+        </View>
+      )}
 
       {!live.threadsSupported ? (
         <Text style={{ fontFamily: T.uiFont, fontSize: 12.5, color: T.tx2, paddingHorizontal: 4 }}>

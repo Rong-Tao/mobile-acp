@@ -4,12 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { THEME, AccentType } from '../theme';
 import type { Server, Project } from '../data/types';
 import { Icon } from '../components/Icon';
-import { Press, Dot, Spinner, Sheet, Btn } from '../components/Primitives';
+import { Press, Spinner, Btn } from '../components/Primitives';
 import { LiveAgentTab } from '../tabs/LiveAgentTab';
 import { FilesTab } from '../tabs/FilesTab';
 import { GitTab } from '../tabs/GitTab';
 import { ThreadsTab } from '../tabs/ThreadsTab';
-import { LiveProvider, SshLiveProvider, useLive } from '../core/live-context';
+import { LiveProvider, SshLiveProvider, useLive, type LiveStatus } from '../core/live-context';
+import { useSessionState } from '../core/live';
 import { loadCredential } from '../core/credentials';
 import type { SshConfig } from '../core/ssh-transport';
 
@@ -55,10 +56,19 @@ function TopTabs({ tab, setTab, accent, onBack }: { tab: TabId; setTab: (t: TabI
 }
 
 // ── Context Header ────────────────────────────────────────────
-type Conn = 'online' | 'connecting' | 'offline';
+// 真实状态文字（取代以前会说谎的小绿点）：
+// initing = 建连/起 agent;working = turn 进行中;connected = 空闲在线;
+// reconnecting = 心跳判死后自动重连中;lost connection = 连接失败(点击立即重试)
+function statusLabel(status: LiveStatus, busy: boolean): { text: string; color: string } {
+  if (status === 'connecting') return { text: 'initing…', color: T.yellow };
+  if (status === 'lost') return { text: 'reconnecting…', color: T.yellow };
+  if (status === 'error' || status === 'off') return { text: 'lost connection', color: T.red };
+  if (busy) return { text: 'working', color: T.cyan };
+  return { text: 'connected', color: T.green };
+}
 
-function ContextHeader({ tab, accent, conn, curAgent, onAgentTap, onNewThread, serverName, projectName }:
-  { tab: TabId; accent: AccentType; conn: Conn; curAgent: typeof AGENT_CHOICES[0]; onAgentTap: () => void; onNewThread: () => void; serverName: string; projectName: string }) {
+function ContextHeader({ tab, accent, status, busy, onStatusTap, curAgent, onNewThread, serverName, projectName }:
+  { tab: TabId; accent: AccentType; status: LiveStatus; busy: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
 
   const avatar = tab === 'agent'
     ? { icon: curAgent.icon, tint: curAgent.tint }
@@ -67,21 +77,20 @@ function ContextHeader({ tab, accent, conn, curAgent, onAgentTap, onNewThread, s
 
   const title = tab === 'agent' ? curAgent.name : tab === 'threads' ? 'Threads' : projectName;
   const sub = tab === 'agent' || tab === 'threads' ? `${projectName} · ${serverName}` : `${serverName} · ${projectName}`;
-  const connColor = conn === 'online' ? T.green : conn === 'connecting' ? T.yellow : T.red;
+  const st = statusLabel(status, busy);
+  const stuck = status === 'error' || status === 'off' || status === 'lost';
 
   return (
     <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingRight: 8, backgroundColor: T.bg1, borderBottomWidth: 1, borderColor: T.borderSoft }}>
       <View style={{ width: 32, height: 32, borderRadius: 9, backgroundColor: avatar.tint + '22', borderWidth: 1, borderColor: avatar.tint + '44', alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={avatar.icon} size={17} color={avatar.tint} />
       </View>
-      <Press onPress={tab === 'agent' ? onAgentTap : undefined} style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15, color: T.tx0, letterSpacing: -0.01 * 15 }} numberOfLines={1}>{title}</Text>
-          {tab === 'agent' && <Icon name="chevD" size={14} color={T.tx2} />}
-        </View>
+      <Press onPress={stuck ? onStatusTap : undefined} style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15, color: T.tx0, letterSpacing: -0.01 * 15 }} numberOfLines={1}>{title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
-          <Dot color={connColor} glow={conn === 'online'} size={6} />
-          <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2 }} numberOfLines={1}>{sub}</Text>
+          {busy && status === 'on' && <Spinner size={9} color={st.color} />}
+          <Text style={{ fontFamily: T.monoFontMedium, fontSize: 11, color: st.color }}>{st.text}</Text>
+          <Text style={{ fontFamily: T.monoFont, fontSize: 11, color: T.tx2, flexShrink: 1 }} numberOfLines={1}>· {sub}</Text>
         </View>
       </Press>
       {tab === 'agent' && (
@@ -113,7 +122,7 @@ export function MainShell(props: MainShellProps) {
   const inner = (
     <MainShellInner {...props} curAgent={agent}
       onPickAgent={(a) => { setAgent(a); setGen(g => g + 1); }}
-      onReconnect={() => setGen(g => g + 1)} />
+    />
   );
 
   if (ssh) {
@@ -135,15 +144,12 @@ export function MainShell(props: MainShellProps) {
 type InnerProps = MainShellProps & {
   curAgent: typeof AGENT_CHOICES[0];
   onPickAgent: (a: typeof AGENT_CHOICES[0]) => void;
-  onReconnect: () => void;
 };
 
-function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent, onReconnect }: InnerProps) {
+function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent }: InnerProps) {
   const live = useLive();
   const [tab, setTabRaw] = useState<TabId>('agent');
-  const [agentPicker, setAgentPicker] = useState(false);
-
-  const conn: Conn = live.status === 'on' ? 'online' : live.status === 'connecting' ? 'connecting' : 'offline';
+  const sessionState = useSessionState(live.session);
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg0 }}>
@@ -152,9 +158,10 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
         <ContextHeader
           tab={tab}
           accent={accent}
-          conn={conn}
+          status={live.status}
+          busy={sessionState.busy}
+          onStatusTap={live.reconnect}
           curAgent={curAgent}
-          onAgentTap={() => setAgentPicker(true)}
           onNewThread={() => { live.newThread().catch(() => {}); }}
           serverName={server.name}
           projectName={project.name}
@@ -170,39 +177,16 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
               </View>
             : live.session
               ? <LiveAgentTab key={live.session.sessionId} session={live.session} accent={accent} />
-              : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={onReconnect} />
+              : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={live.reconnect} />
         )}
-        {tab === 'threads' && <ThreadsTab accent={accent} onOpened={() => setTabRaw('agent')} />}
+        {tab === 'threads' && (
+          <ThreadsTab accent={accent} onOpened={() => setTabRaw('agent')}
+            agents={AGENT_CHOICES} curAgentId={curAgent.id}
+            onPickAgent={(id) => { const a = AGENT_CHOICES.find(x => x.id === id); if (a) onPickAgent(a); }} />
+        )}
         {tab === 'files' && <FilesTab accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
         {tab === 'git'   && <GitTab   accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
       </View>
-
-      {/* agent picker（切换会真实重启会话）*/}
-      <Sheet open={agentPicker} onClose={() => setAgentPicker(false)}>
-        <View style={{ paddingHorizontal: 12, paddingBottom: 14 }}>
-          <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 15, color: T.tx0, paddingHorizontal: 6, paddingTop: 6, paddingBottom: 4 }}>Agent</Text>
-          <Text style={{ fontFamily: T.uiFont, fontSize: 12, color: T.tx2, paddingHorizontal: 6, paddingBottom: 10 }}>
-            Switching restarts the session with the selected agent
-          </Text>
-          {AGENT_CHOICES.map(a => {
-            const active = a.id === curAgent.id;
-            return (
-              <Press key={a.id} onPress={() => { setAgentPicker(false); if (!active) onPickAgent(a); }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 8, borderRadius: 12, backgroundColor: active ? accent.dim : 'transparent' }}>
-                <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: a.tint + '22', borderWidth: 1, borderColor: a.tint + '44', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name={a.icon} size={19} color={a.tint} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontFamily: T.uiFontSemiBold, fontSize: 14.5, color: T.tx0 }}>{a.name}</Text>
-                  <Text style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.tx2 }} numberOfLines={1}>{a.cmd}</Text>
-                </View>
-                {active && <Icon name="check" size={18} color={accent.hue} />}
-              </Press>
-            );
-          })}
-        </View>
-      </Sheet>
-
     </View>
   );
 }

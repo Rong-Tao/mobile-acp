@@ -7,6 +7,12 @@
 //
 // thread 管理也在这层：session 是"当前 thread"，可新开/切换历史 thread，
 // agent 进程保持不动。
+//
+// 健康检测：SSH 会静默死掉（锁屏/切网/NAT 超时），所以
+// - 心跳：每 15s exec('true')，10s 超时 → 判死
+// - 所有 exec 带 25s 超时，不再无限挂起
+// - 判死后自动重连（持久化 agent + lastThreadId 让重连代价很小），
+//   连接失败则 15s 后再试，不需要重启 app
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { SessionInfo } from '@agentclientprotocol/sdk';
@@ -16,8 +22,23 @@ import { WsTransport } from './ws-transport';
 import { SshTransport, type SshConfig } from './ssh-transport';
 import type { Transport, ExecResult } from './transport';
 
-export type LiveStatus = 'connecting' | 'on' | 'off' | 'error';
+export type LiveStatus = 'connecting' | 'on' | 'lost' | 'error' | 'off';
 export type LiveExec = (cmd: string, cwd?: string) => Promise<ExecResult>;
+
+const HEARTBEAT_MS = 15000;
+const HEARTBEAT_TIMEOUT_MS = 10000;
+const EXEC_TIMEOUT_MS = 25000;
+const RETRY_MS = 15000;
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
 
 interface LiveCtxValue {
   /** 当前 thread 的会话 */
@@ -34,6 +55,8 @@ interface LiveCtxValue {
   newThread: () => Promise<void>;
   openThread: (sessionId: string) => Promise<void>;
   refreshThreads: () => Promise<void>;
+  /** 手动重连（自动重连失败后 UI 的 Retry 也走这里） */
+  reconnect: () => void;
 }
 
 const NOOP = async () => {};
@@ -41,6 +64,7 @@ const EMPTY_CTX: LiveCtxValue = {
   session: null, status: 'off', error: null, exec: null,
   threads: [], threadsSupported: false, threadLoading: false,
   newThread: NOOP, openThread: NOOP as (id: string) => Promise<void>, refreshThreads: NOOP,
+  reconnect: () => {},
 };
 
 const LiveCtx = createContext<LiveCtxValue>(EMPTY_CTX);
@@ -56,7 +80,7 @@ export function bridgeUrl(): string {
   return 'ws://localhost:8081';
 }
 
-// 两条路径共用的连接流程：先建 transport（exec 立即可用），再起 agent + 首个 thread
+// 两条路径共用的连接流程：先建 transport（exec 立即可用），再起 agent + 恢复 thread
 function useLiveValue(
   makeTransport: () => Promise<Transport>,
   cwd: string,
@@ -68,7 +92,13 @@ function useLiveValue(
     { session: null, status: 'connecting', error: null, exec: null });
   const [threads, setThreads] = useState<SessionInfo[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
-  const ref = useRef<{ live?: LiveAgent; transport?: Transport; dead?: boolean }>({});
+  const [tick, setTick] = useState(0); // bump = 重建连接
+  const ref = useRef<{ live?: LiveAgent; transport?: Transport; dead?: boolean; retry?: ReturnType<typeof setTimeout> }>({});
+
+  const reconnect = useCallback(() => {
+    if (ref.current.retry) clearTimeout(ref.current.retry);
+    setTick((t) => t + 1);
+  }, []);
 
   const refreshThreads = useCallback(async () => {
     const live = ref.current.live;
@@ -114,13 +144,33 @@ function useLiveValue(
     state.dead = false;
     setBase({ session: null, status: 'connecting', error: null, exec: null });
     setThreads([]);
+
+    // 判死 → 标记 lost → 短暂延迟后重建连接
+    const markLost = (why: string) => {
+      if (state.dead) return;
+      console.warn('[conn] lost:', why);
+      setBase((b) => ({ ...b, status: 'lost' }));
+      if (state.retry) clearTimeout(state.retry);
+      state.retry = setTimeout(() => { if (!state.dead) setTick((t) => t + 1); }, 1500);
+    };
+
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+
     (async () => {
       let exec: LiveExec | null = null;
       try {
-        const transport = await makeTransport();
+        const transport = await withTimeout(makeTransport(), 20000);
         if (state.dead) { transport.close(); return; }
         state.transport = transport;
-        exec = (cmd, c) => transport.exec(cmd, c ? { cwd: c } : undefined);
+        // 所有 exec 带超时：传输层死掉时 Files/Git 快速失败而不是永久转圈
+        exec = async (cmd, c) => {
+          try {
+            return await withTimeout(transport.exec(cmd, c ? { cwd: c } : undefined), EXEC_TIMEOUT_MS);
+          } catch (err) {
+            if (String(err).includes('timed out')) markLost('exec timeout');
+            throw err;
+          }
+        };
         // transport 就绪：exec 先行可用，agent 还在启动
         setBase({ session: null, status: 'connecting', error: null, exec });
         const live = await LiveAgent.connect({
@@ -133,20 +183,36 @@ function useLiveValue(
         const session = await live.resumeOrNewThread();
         if (state.dead) { live.dispose(); transport.close(); return; }
         setBase({ session, status: 'on', error: null, exec });
+
+        // 心跳：轻量 exec 验证 SSH 真的还活着
+        heartbeat = setInterval(async () => {
+          if (state.dead) return;
+          try {
+            await withTimeout(transport.exec('true'), HEARTBEAT_TIMEOUT_MS);
+          } catch (err) {
+            markLost(`heartbeat: ${err}`);
+          }
+        }, HEARTBEAT_MS);
       } catch (err) {
-        // agent 失败不影响已建立的 exec
-        if (!state.dead) setBase({ session: null, status: 'error', error: String(err), exec });
+        // 连接失败：报错 + 15s 后自动再试（手动 Retry 也随时可点）
+        if (!state.dead) {
+          setBase({ session: null, status: 'error', error: String(err), exec });
+          if (state.retry) clearTimeout(state.retry);
+          state.retry = setTimeout(() => { if (!state.dead) setTick((t) => t + 1); }, RETRY_MS);
+        }
       }
     })();
     return () => {
       state.dead = true;
+      if (heartbeat) clearInterval(heartbeat);
+      if (state.retry) clearTimeout(state.retry);
       state.live?.dispose();
       state.transport?.close();
       state.live = undefined;
       state.transport = undefined;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, tick]);
 
   return {
     ...base,
@@ -156,6 +222,7 @@ function useLiveValue(
     newThread,
     openThread,
     refreshThreads,
+    reconnect,
   };
 }
 

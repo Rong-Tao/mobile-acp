@@ -2,7 +2,20 @@
 
 > 本地调试细节(私有服务器、测试链路搭建)见 `NOTES.local.md`(gitignored,不入库)。
 
-## 未发布(working tree)— 2026-10-09 (第二批)
+## 未发布(working tree)— 2026-10-09 (第三批)
+
+**连接健康 + 状态真实化:**
+- **心跳与超时**(live-context):每 15s exec('true') 心跳(10s 超时),所有 exec 带 25s 超时——
+  SSH 静默死掉不再表现为"绿点还亮着但 Files 空白永久转圈"
+- **自动重连**:判死 → 1.5s 后重建连接(persist agent + lastThreadId 让重连近乎无感);
+  连接失败 15s 自动重试,也可点头部状态/Retry 手动触发;重连后 exec 引用更新,Files/Git 自动重取
+- **头部状态文字化**(替代会说谎的小绿点):initing(黄)/connected(绿)/working(青,带 spinner)/
+  reconnecting(黄)/lost connection(红,可点击立即重连)
+- **去掉 agent 小三角**:thread 的 agent 定了不换;agent 选择挪到 Threads 面板(New thread 下方 chips)
+- 冒烟 `uitest/resilience.mjs` 8/8:杀 bridge → 状态如实降级 → 重启 bridge → 自动恢复 +
+  Files 自动回来 + working 状态;threads2 8/8、原 ui 15/15 无回归
+
+## 2026-10-09 (第二批,已发 v0.1.19;v0.1.20 修键盘遮挡)
 
 **会话持久化 + 后台通知:**
 - **持久化 agent 进程**(`src/core/persist.ts`):spawn 包装为 setsid 脱离 + FIFO stdin(0<> 自持写端
