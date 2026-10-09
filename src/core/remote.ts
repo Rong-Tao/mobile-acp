@@ -88,9 +88,12 @@ export const KNOWN_AGENTS: Omit<DetectedAgent, 'ok' | 'version'>[] = [
   { id: 'gemini', name: 'Gemini CLI', bin: 'gemini', cmd: 'gemini --experimental-acp' },
 ];
 
-// 一次 exec 探测所有已知 agent 是否安装 + 版本
+// 一次 exec 探测所有已知 agent 是否安装 + 版本。
+// 非交互 SSH 的 PATH 不含用户级 bin（如 ~/.local/bin 的 claude），手动补上
+const PATH_PREFIX = 'PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/bin:/usr/local/bin:$PATH"; ';
+
 export async function detectAgents(exec: Exec): Promise<DetectedAgent[]> {
-  const script = KNOWN_AGENTS.map((a) =>
+  const script = PATH_PREFIX + KNOWN_AGENTS.map((a) =>
     `printf '%s\\n' '${MARK}'; if command -v ${a.bin} >/dev/null 2>&1; then printf 'Y\\n'; ${a.bin} --version 2>/dev/null | head -1; else printf 'N\\n'; fi`
   ).join('; ');
   const res = await exec(script);

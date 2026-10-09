@@ -1,6 +1,7 @@
-// 手动验收：remote.ts 过真实 SSH（stray.exe.xyz）只读测试。
+// 手动验收：remote.ts 过真实 SSH 的只读测试，主机无关。
 // 不进 CI（文件名含 .manual.），不写远端任何东西。
-// 跑法: npx vitest run test/ssh-live.manual.test.ts
+// 跑法: SSH_TEST_HOST=<host> npx vitest run test/ssh-live.manual.test.ts
+//       （host 是 ~/.ssh/config 里的别名，如 stray.exe.xyz / gcp-test）
 
 import { describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
@@ -18,37 +19,37 @@ const exec: Exec = (cmd, cwd) => new Promise((resolve) => {
 });
 
 describe(`remote.ts over real ssh to ${HOST} (read-only)`, () => {
-  it('listDirs lists real home directories', async () => {
+  it('listDirs lists home directories and can enter one', async () => {
     const dirs = await listDirs(exec, '~');
     expect(dirs.length).toBeGreaterThan(0);
-    expect(dirs).toContain('stray');
-    expect(dirs).toContain('web');
+    const sub = await listDirs(exec, `~/${dirs[0]}`);
+    expect(Array.isArray(sub)).toBe(true);
   }, 30000);
 
-  it('scanGitRepos finds real repos', async () => {
+  it('scanGitRepos finds repos with ~ paths', async () => {
     const repos = await scanGitRepos(exec);
-    expect(repos).toContain('~/stray-mail');
+    expect(repos.length).toBeGreaterThan(0);
     for (const r of repos) expect(r.startsWith('~/')).toBe(true);
-  }, 30000);
+  }, 60000);
 
-  it('statProjects reports real branch/dirty for stray-mail', async () => {
-    const [mail, web, missing] = await statProjects(exec, ['~/stray-mail', '~/web', '~/no-such-dir-xyz']);
-    expect(mail).toMatchObject({ exists: true, isGit: true, name: 'stray-mail' });
-    expect(mail.branch.length).toBeGreaterThan(0);
-    expect(mail.dirty).toBeGreaterThanOrEqual(0);
-    expect(web.exists).toBe(true);
+  it('statProjects reports real branch for a scanned repo, flags missing dirs', async () => {
+    const repos = await scanGitRepos(exec);
+    const [repo, missing] = await statProjects(exec, [repos[0], '~/no-such-dir-xyz']);
+    expect(repo).toMatchObject({ exists: true, isGit: true });
+    expect(repo.branch.length).toBeGreaterThan(0);
+    expect(repo.dirty).toBeGreaterThanOrEqual(0);
     expect(missing.exists).toBe(false);
-  }, 30000);
+  }, 60000);
 
-  it('detectAgents probes real binaries', async () => {
+  it('detectAgents probes all known agents without error', async () => {
     const agents = await detectAgents(exec);
-    const claude = agents.find(a => a.id === 'claude')!;
-    expect(claude.ok).toBe(true); // stray 服务器装了 claude CLI
+    expect(agents).toHaveLength(3);
+    for (const a of agents) expect(typeof a.ok).toBe('boolean');
+    console.log(`${HOST} agents:`, agents.map(a => `${a.bin}=${a.ok ? (a.version || 'yes') : 'no'}`).join(' '));
   }, 30000);
 
-  it('listDirs inside a subdir', async () => {
-    const dirs = await listDirs(exec, '~/stray');
-    expect(dirs).toContain('log');
-    expect(dirs).toContain('tools');
+  it('shq round-trips paths through the real remote shell', async () => {
+    const res = await exec(`echo ${shq('~/somewhere')}`);
+    expect(res.stdout.trim()).toMatch(/^\/.+\/somewhere$/);
   }, 30000);
 });
