@@ -58,9 +58,14 @@ function useServerTransport(server: Server) {
     return () => { st.dead = true; st.transport?.close(); st.transport = undefined; };
   }, [server.id, gen]);
 
-  const exec: Exec | null = state === 'online' && ref.current.transport
-    ? (cmd, cwd) => ref.current.transport!.exec(cmd, cwd ? { cwd } : undefined)
-    : null;
+  // useMemo 保证 exec 引用稳定——否则每次渲染生成新函数，
+  // 依赖 exec 的 effect 会 setState→重渲染→新 exec→无限循环（v0.1.12 的卡死 bug）
+  const exec: Exec | null = React.useMemo(
+    () => state === 'online' && ref.current.transport
+      ? (cmd, cwd) => ref.current.transport!.exec(cmd, cwd ? { cwd } : undefined)
+      : null,
+    [state, gen],
+  );
 
   return { state, error, exec, retry: () => setGen(g => g + 1) };
 }
@@ -304,7 +309,6 @@ export function ServerDetail({ server, accent, onBack, onOpenProject }: ServerDe
     offline: { color: T.red, label: 'Offline' },
   }[state];
 
-  const transportRef = exec ? true : false;
 
   return (
     <View style={{ flex: 1, backgroundColor: T.bg0 }}>
@@ -355,8 +359,9 @@ export function ServerDetail({ server, accent, onBack, onOpenProject }: ServerDe
               </View>
             )}
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              <Btn kind="ghost" full icon="plus" onPress={() => setPicker(true)} disabled={!transportRef}>Add directory</Btn>
-              <Btn kind="ghost" full icon="search" onPress={scan} disabled={!transportRef || scanning}>{scanning ? 'Scanning…' : 'Scan repos'}</Btn>
+              {/* 不能用 full（width:100%）——两个并排会把第二个挤出屏幕 */}
+              <Btn kind="ghost" icon="plus" onPress={() => setPicker(true)} disabled={!exec} style={{ flex: 1 }}>Add directory</Btn>
+              <Btn kind="ghost" icon="search" onPress={scan} disabled={!exec || scanning} style={{ flex: 1 }}>{scanning ? 'Scanning…' : 'Scan repos'}</Btn>
             </View>
           </>
         )}
