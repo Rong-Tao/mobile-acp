@@ -163,8 +163,8 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
             ? <LiveAgentTab session={live.session} accent={accent} />
             : <AgentStatus accent={accent} status={live.status} error={live.error} agentName={curAgent.name} onRetry={onReconnect} />
         )}
-        {tab === 'files' && <FilesTab accent={accent} exec={live.session ? (cmd, cwd) => live.session!.exec(cmd, cwd) : undefined} cwd={project.path} />}
-        {tab === 'git'   && <GitTab   accent={accent} exec={live.session ? (cmd, cwd) => live.session!.exec(cmd, cwd) : undefined} cwd={project.path} />}
+        {tab === 'files' && <FilesTab accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
+        {tab === 'git'   && <GitTab   accent={accent} exec={live.exec ?? undefined} cwd={project.path} />}
       </View>
 
       {/* agent picker（切换会真实重启会话）*/}

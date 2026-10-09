@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { shq } from '../core/remote';
 import { THEME, AccentType } from '../theme';
 import type { GitFile, DiffHunk } from '../data/types';
 import { Icon } from '../components/Icon';
@@ -222,9 +223,9 @@ export function GitTab({ accent, exec, cwd }: GitTabProps) {
     setLoading(true);
     try {
       const [statusRes, numstatRes, numstatCachedRes] = await Promise.all([
-        exec(`git -C ${JSON.stringify(cwd)} status --porcelain`),
-        exec(`git -C ${JSON.stringify(cwd)} diff --numstat`),
-        exec(`git -C ${JSON.stringify(cwd)} diff --cached --numstat`),
+        exec(`git -C ${shq(cwd)} status --porcelain`),
+        exec(`git -C ${shq(cwd)} diff --numstat`),
+        exec(`git -C ${shq(cwd)} diff --cached --numstat`),
       ]);
       const parsed   = parsePorcelain(statusRes.stdout);
       const stats    = parseNumstat(numstatRes.stdout);
@@ -258,7 +259,7 @@ export function GitTab({ accent, exec, cwd }: GitTabProps) {
     setDiff({ path: file.path, hunks: [], addTotal: 0, delTotal: 0 });
     try {
       const flag = isStaged ? '--cached ' : '';
-      const res = await exec(`git -C ${JSON.stringify(cwd)} diff ${flag}-- ${JSON.stringify(file.path)}`);
+      const res = await exec(`git -C ${shq(cwd)} diff ${flag}-- ${shq(file.path)}`);
       setDiff(parseUnifiedDiff(res.stdout));
     } catch (e) {
       console.warn('[GitTab] diff error', e);
@@ -274,9 +275,9 @@ export function GitTab({ accent, exec, cwd }: GitTabProps) {
       // stage selected files
       const toStage = [...staged, ...unstaged, ...untracked].filter(f => stagedSet.has(f.path)).map(f => f.path);
       if (toStage.length > 0) {
-        await exec(`git -C ${JSON.stringify(cwd)} add -- ${toStage.map(p => JSON.stringify(p)).join(' ')}`);
+        await exec(`git -C ${shq(cwd)} add -- ${toStage.map(p => shq(p)).join(' ')}`);
       }
-      await exec(`git -C ${JSON.stringify(cwd)} commit -m ${JSON.stringify(commit)}`);
+      await exec(`git -C ${shq(cwd)} commit -m ${shq(commit)}`);
       setCommit('');
       reload();
     } catch (e) {
@@ -339,7 +340,7 @@ export function GitTab({ accent, exec, cwd }: GitTabProps) {
               accent={accent}
               onStage={diff ? () => { toggle(diff.path); setDiff(null); } : undefined}
               onDiscard={diff && exec ? async () => {
-                await exec(`git -C ${JSON.stringify(cwd!)} checkout -- ${JSON.stringify(diff.path)}`);
+                await exec(`git -C ${shq(cwd!)} checkout -- ${shq(diff.path)}`);
                 reload(); setDiff(null);
               } : undefined}
               onClose={() => setDiff(null)}

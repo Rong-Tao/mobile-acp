@@ -27,6 +27,7 @@
     "expo-splash-screen": "~0.29.24",
     "expo-ssh-transport": "file:./modules/ssh-transport",
     "expo-status-bar": "~2.0.0",
+    "fast-text-encoding": "^1.0.6",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.3",
@@ -34,6 +35,7 @@
     "react-native-screens": "~4.1.0",
     "react-native-svg": "15.8.0",
     "react-native-web": "~0.19.13",
+    "web-streams-polyfill": "^4.3.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

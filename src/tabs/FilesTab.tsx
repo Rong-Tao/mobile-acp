@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, Animated, ActivityIndicator } from 'react-native';
+import { shq } from '../core/remote';
 import { THEME, AccentType } from '../theme';
 import type { TreeNode } from '../data/types';
 import { Icon } from '../components/Icon';
@@ -135,7 +136,7 @@ export function FilesTab({ accent, exec, cwd }: FilesTabProps) {
   useEffect(() => {
     if (useMock) return;
     setRootLoading(true);
-    exec!(`ls -la ${JSON.stringify(cwd!)}`)
+    exec!(`ls -la ${shq(cwd!)}`)
       .then(res => setTree(parseLs(res.stdout, 0, 'root')))
       .catch(e => console.warn('[FilesTab] ls error', e))
       .finally(() => setRootLoading(false));
@@ -150,7 +151,7 @@ export function FilesTab({ accent, exec, cwd }: FilesTabProps) {
       setLoadingDirs(s => { const n = new Set(s); n.add(node.id); return n; });
       try {
         const dirPath = cwd + node.id.slice('root'.length);
-        const res = await exec!(`ls -la ${JSON.stringify(dirPath)}`);
+        const res = await exec!(`ls -la ${shq(dirPath)}`);
         const children = parseLs(res.stdout, node.depth + 1, node.id);
         setTree(prev => {
           const update = (nodes: TreeNode[]): TreeNode[] =>
@@ -175,7 +176,7 @@ export function FilesTab({ accent, exec, cwd }: FilesTabProps) {
     setPreviewLoading(true);
     try {
       const filePath = cwd + node.id.slice('root'.length);
-      const res = await exec!(`cat ${JSON.stringify(filePath)}`);
+      const res = await exec!(`cat ${shq(filePath)}`);
       setPreviewContent(res.stdout);
     } catch {
       setPreviewContent('(error reading file)');
