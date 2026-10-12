@@ -12,6 +12,7 @@ import { ThreadsTab } from '../tabs/ThreadsTab';
 import { TerminalTab } from '../tabs/TerminalTab';
 import { LiveProvider, SshLiveProvider, useLive, type LiveStatus } from '../core/live-context';
 import { useSessionState, requestFreshThread } from '../core/live';
+import { agentPhase, type AgentPhase } from '../core/acp/session-store';
 import { loadCredential } from '../core/credentials';
 import type { SshConfig } from '../core/ssh-transport';
 
@@ -69,8 +70,8 @@ function sshLabel(status: LiveStatus): { text: string; color: string } {
   return { text: 'connected', color: T.green };
 }
 
-function ContextHeader({ tab, accent, status, busy, hasSession, terminalView, onStatusTap, curAgent, onNewThread, serverName, projectName }:
-  { tab: TabId; accent: AccentType; status: LiveStatus; busy: boolean; hasSession: boolean; terminalView: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
+function ContextHeader({ tab, accent, status, phase, hasSession, terminalView, onStatusTap, curAgent, onNewThread, serverName, projectName }:
+  { tab: TabId; accent: AccentType; status: LiveStatus; phase: AgentPhase; hasSession: boolean; terminalView: boolean; onStatusTap: () => void; curAgent: typeof AGENT_CHOICES[0]; onNewThread: () => void; serverName: string; projectName: string }) {
 
   const avatar = tab === 'agent'
     ? (terminalView ? { icon: 'terminal', tint: T.green } : { icon: curAgent.icon, tint: curAgent.tint })
@@ -100,12 +101,13 @@ function ContextHeader({ tab, accent, status, busy, hasSession, terminalView, on
         {showAgentChip && (
           <View style={{
             flexDirection: 'row', alignItems: 'center', gap: 5, height: 24, paddingHorizontal: 10, borderRadius: 12,
-            backgroundColor: busy ? T.cyan + '1a' : T.bg2,
-            borderWidth: 1, borderColor: busy ? T.cyan + '55' : T.borderSoft,
+            backgroundColor: phase === 'awaiting' ? T.yellow + '1a' : phase === 'working' ? T.cyan + '1a' : T.bg2,
+            borderWidth: 1, borderColor: phase === 'awaiting' ? T.yellow + '66' : phase === 'working' ? T.cyan + '55' : T.borderSoft,
           }}>
-            {busy && <Spinner size={10} color={T.cyan} />}
-            <Text style={{ fontFamily: T.monoFontMedium, fontSize: 10.5, color: busy ? T.cyan : T.tx2 }}>
-              {busy ? 'working' : 'idle'}
+            {phase === 'working' && <Spinner size={10} color={T.cyan} />}
+            {phase === 'awaiting' && <Icon name="warn" size={11} color={T.yellow} />}
+            <Text style={{ fontFamily: T.monoFontMedium, fontSize: 10.5, color: phase === 'awaiting' ? T.yellow : phase === 'working' ? T.cyan : T.tx2 }}>
+              {phase === 'awaiting' ? 'needs approval' : phase}
             </Text>
           </View>
         )}
@@ -197,7 +199,7 @@ function MainShellInner({ server, project, accent, onBack, curAgent, onPickAgent
           tab={tab}
           accent={accent}
           status={live.status}
-          busy={sessionState.busy}
+          phase={agentPhase(sessionState)}
           hasSession={!!live.session}
           terminalView={view === 'terminal'}
           onStatusTap={live.reconnect}

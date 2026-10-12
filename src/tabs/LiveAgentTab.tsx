@@ -9,7 +9,7 @@ import { Press, Spinner, Sheet } from '../components/Primitives';
 import { InlineMd, ToolCard, Bubble } from '../components/AgentBits';
 import type { Message } from '../data/types';
 import { LiveSession, useSessionState } from '../core/live';
-import type { PendingPermission, ThreadEntry, ToolCallEntry } from '../core/acp/session-store';
+import { agentPhase, type PendingPermission, type ThreadEntry, type ToolCallEntry } from '../core/acp/session-store';
 import type { PlanEntry, SessionConfigOption, SessionConfigSelectOption } from '@agentclientprotocol/sdk';
 
 const T = THEME;
@@ -20,7 +20,7 @@ const KIND_ICON: Record<string, string> = {
   execute: 'execute', think: 'read', switch_mode: 'execute', other: 'execute',
 };
 
-function toolEntryToMessage(e: ToolCallEntry): Message {
+function toolEntryToMessage(e: ToolCallEntry, awaiting = false): Message {
   const texts: string[] = [];
   let diffAdd: number | undefined;
   for (const c of e.content) {
@@ -41,8 +41,8 @@ function toolEntryToMessage(e: ToolCallEntry): Message {
     tool: KIND_ICON[e.kind] ?? 'execute',
     title: e.title,
     target: String(target),
-    status: e.status,
-    meta: e.status === 'in_progress' ? 'running…' : e.status,
+    status: awaiting ? 'in_progress' : e.status,
+    meta: awaiting ? 'awaiting approval' : e.status === 'in_progress' ? 'running…' : e.status,
     output: texts.join('\n') || undefined,
     diffAdd,
   };
@@ -59,7 +59,7 @@ function LivePermissionCard({ p, accent }: { p: PendingPermission; accent: Accen
     '';
   return (
     <View style={{
-      backgroundColor: T.bg2, borderWidth: 1, borderColor: accent.hue + '66', borderRadius: 13, overflow: 'hidden',
+      backgroundColor: T.bg2, borderWidth: 1, borderColor: T.yellow + '88', borderRadius: 13, overflow: 'hidden',
     }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13, paddingBottom: 10 }}>
         <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: accent.dim, alignItems: 'center', justifyContent: 'center' }}>
@@ -191,6 +191,9 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
     return () => sub.remove();
   }, []);
 
+  const phase = agentPhase(state);
+  const awaitingId = state.pendingPermission?.request.toolCall?.toolCallId;
+
   const send = () => {
     const text = input.trim();
     if (!text || state.busy) return;
@@ -214,7 +217,7 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
     }
     if (e.type === 'thought') return <ThoughtBlock key={i} text={e.text} />;
     if (e.type === 'tool_call') {
-      return <ToolCard key={e.toolCallId} m={toolEntryToMessage(e)} accent={accent} compact={false} lineNumbers={false} />;
+      return <ToolCard key={e.toolCallId} m={toolEntryToMessage(e, e.toolCallId === awaitingId)} accent={accent} compact={false} lineNumbers={false} />;
     }
     return null;
   };
@@ -239,7 +242,7 @@ export function LiveAgentTab({ session, accent }: { session: LiveSession; accent
         {state.entries.map(renderEntry)}
         {state.plan && state.plan.length > 0 && <PlanCard plan={state.plan} accent={accent} />}
         {state.pendingPermission && <LivePermissionCard p={state.pendingPermission} accent={accent} />}
-        {state.busy && !state.pendingPermission && (
+        {phase === 'working' && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Spinner size={14} color={accent.hue} />
             <Text style={{ fontFamily: T.uiFont, fontSize: 13, color: T.tx2 }}>Working…</Text>

@@ -58,6 +58,12 @@ export interface SessionState {
   busy: boolean;
 }
 
+/** idle / working / awaiting（turn 进行中但卡在等用户批准权限） */
+export type AgentPhase = 'idle' | 'working' | 'awaiting';
+export function agentPhase(s: Pick<SessionState, 'busy' | 'pendingPermission'>): AgentPhase {
+  return s.pendingPermission ? 'awaiting' : s.busy ? 'working' : 'idle';
+}
+
 type Listener = (state: SessionState) => void;
 
 export class SessionStore {

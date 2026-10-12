@@ -14,18 +14,23 @@ function slug(s: string): string {
   return h.toString(16);
 }
 
+/** 持久 agent 的目录（in FIFO / out.log / pid），与 persistentSpawnCmd 内的 DIR 一致 */
+export function agentDirExpr(cwd: string, agentId: string): string {
+  return `"$HOME/.mobile-acp/agents/${slug(`${agentId}:${cwd}`)}"`;
+}
+
 /**
  * 把 agent 启动命令包装成"持久进程 + 可重连通道"。
  * cwd 必须已是绝对路径(LiveAgent.connect 已解析 ~)。
  */
 export function persistentSpawnCmd(agentCmd: string, cwd: string, agentId: string): string {
-  const key = slug(`${agentId}:${cwd}`);
+  const dir = agentDirExpr(cwd, agentId);
   // 注意:
   // - inner sh -c 用 "$0" 传 DIR,避免引号嵌套
   // - cat 必须在前台(后台 job 的 stdin 会被重定向到 /dev/null)
   // - tail -c 0 从末尾接流,不回放旧 JSON-RPC(旧 response 会污染新连接)
   return `
-DIR="$HOME/.mobile-acp/agents/${key}"
+DIR=${dir}
 if command -v setsid >/dev/null 2>&1 && command -v mkfifo >/dev/null 2>&1; then
   mkdir -p "$DIR"
   [ -p "$DIR/in" ] || mkfifo "$DIR/in"

@@ -8,7 +8,8 @@ import type { SessionInfo, SessionModeState } from '@agentclientprotocol/sdk';
 import { AgentClient } from './acp/agent-client';
 import { SessionStore, type SessionState } from './acp/session-store';
 import { loadAgentPrefs, saveAgentPref } from './agent-prefs';
-import { persistentSpawnCmd } from './persist';
+import { agentDirExpr, persistentSpawnCmd } from './persist';
+import { parseOrphans, scanLogCmd } from './permission-recovery';
 import type { Transport } from './transport';
 
 // "换个 agent 并直接开新 thread"：provider 重建前置个一次性标记，
@@ -47,10 +48,14 @@ export class LiveSession {
     public modes: SessionModeState | null,
   ) {}
 
+  /** 本连接发起的 prompt 在途（区别于重连后接手的"孤儿 turn"） */
+  promptActive = false;
+
   async send(text: string): Promise<void> {
     const blocks = [{ type: 'text' as const, text }];
     this.store.addUserMessage(blocks);
     this.store.setBusy(true);
+    this.promptActive = true;
     try {
       const resp = await this.owner.agent.prompt(this.sessionId, blocks);
       if (resp.stopReason === 'cancelled') {
@@ -62,6 +67,7 @@ export class LiveSession {
         this.owner.opts.notify?.('Agent finished', last && 'text' in last ? last.text.slice(0, 120) : undefined);
       }
     } finally {
+      this.promptActive = false;
       this.store.setBusy(false);
     }
   }
@@ -150,6 +156,12 @@ export class LiveAgent {
               },
             });
           }),
+        onTurnEnd: () => {
+          // 接手的孤儿 turn 结束（它的 prompt promise 在旧连接上，这里收不到）
+          for (const t of live.threads.values()) {
+            if (!t.promptActive && t.store.getState().busy) t.store.setBusy(false);
+          }
+        },
         onStderr: (l) => console.warn('[agent stderr]', l),
         onAgentExit: (code) => console.warn('[agent] exited', code),
       },
@@ -223,7 +235,40 @@ export class LiveAgent {
       store.replaying = false;
     }
     this.savePref({ lastThreadId: sessionId });
+    if (this.opts.persist) await this.recoverPermissions(sess);
     return sess;
+  }
+
+  /**
+   * 持久 agent 重连：上一条连接发出、没人答复的权限请求只在 out.log 里。
+   * 找回来渲染成卡片，答复时直接按原 id 写回 agent stdin。
+   */
+  private async recoverPermissions(sess: LiveSession): Promise<void> {
+    try {
+      const dir = agentDirExpr(this.cwd, this.opts.agentId ?? 'agent');
+      const r = await this.opts.transport.exec(scanLogCmd(dir));
+      const orphans = parseOrphans(r.stdout, sess.sessionId);
+      const o = orphans[orphans.length - 1]; // agent 一次只会卡在一个请求上
+      if (!o) return;
+      const store = sess.store;
+      const tid = o.request.toolCall?.toolCallId;
+      if (store.getState().pendingPermission?.request.toolCall?.toolCallId === tid) return;
+      this.opts.notify?.('Agent needs permission', o.request.toolCall?.title ?? undefined);
+      store.setBusy(true);
+      store.setPendingPermission({
+        request: o.request,
+        resolve: (optionId) => {
+          store.setPendingPermission(null);
+          this.agent.respondRaw(o.id, { outcome: { outcome: 'selected', optionId } });
+        },
+        cancel: () => {
+          store.setPendingPermission(null);
+          this.agent.respondRaw(o.id, { outcome: { outcome: 'cancelled' } });
+        },
+      });
+    } catch (err) {
+      console.warn('[permission-recovery] failed', err);
+    }
   }
 
   /** 本 project 的历史 thread 列表（新→旧） */

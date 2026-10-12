@@ -26,6 +26,11 @@ export interface AgentClientHandlers {
   onPermissionRequest(req: RequestPermissionRequest): Promise<RequestPermissionResponse>;
   onAgentExit?(code: number | null): void;
   onStderr?(line: string): void;
+  /**
+   * 流里出现任何 prompt 的 stopReason（含上一条连接发起、本连接 SDK 不认识的 id）。
+   * 持久 agent 重连后靠它知道"孤儿 turn"结束了。
+   */
+  onTurnEnd?(): void;
 }
 
 export interface AgentClientOptions {
@@ -37,12 +42,18 @@ export interface AgentClientOptions {
   handlers: AgentClientHandlers;
 }
 
-function channelToWebStreams(channel: Channel) {
+function channelToWebStreams(channel: Channel, onTurnEnd?: () => void) {
   const encoder = new TextEncoder();
+  let lineBuf = '';
   const readable = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
       channel.onData((chunk) => {
+        if (onTurnEnd) {
+          const lines = (lineBuf + chunk).split('\n');
+          lineBuf = lines.pop() ?? '';
+          if (lines.some((l) => l.includes('"stopReason"'))) onTurnEnd();
+        }
         if (!closed) controller.enqueue(encoder.encode(chunk));
       });
       channel.onExit(() => {
@@ -75,7 +86,7 @@ export class AgentClient {
     if (opts.handlers.onStderr) channel.onStderr(opts.handlers.onStderr);
     if (opts.handlers.onAgentExit) channel.onExit(opts.handlers.onAgentExit);
 
-    const { readable, writable } = channelToWebStreams(channel);
+    const { readable, writable } = channelToWebStreams(channel, opts.handlers.onTurnEnd);
     const client: Client = {
       sessionUpdate: async (n) => opts.handlers.onSessionUpdate(n),
       requestPermission: (req) => opts.handlers.onPermissionRequest(req),
@@ -130,6 +141,15 @@ export class AgentClient {
 
   async authenticate(methodId: string): Promise<void> {
     await this.conn.authenticate({ methodId });
+  }
+
+  /**
+   * 直接往 agent stdin 写一条 JSON-RPC response。用于答复"上一条连接时发出、
+   * 至今没人回"的 agent→client 请求（持久 agent 重连后，旧请求只存在于 out.log）。
+   * agent 靠 id 匹配，与哪条连接无关。
+   */
+  respondRaw(id: number | string, result: unknown): void {
+    this.channel.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\n');
   }
 
   stop(): void {
