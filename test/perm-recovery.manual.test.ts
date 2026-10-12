@@ -2,7 +2,13 @@
 // 跑法: SSH_TEST_HOST=gcp-test npx vitest run test/perm-recovery.manual.test.ts
 
 import '../src/polyfills';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+
+// node 里没有原生 AsyncStorage：用内存实现，prefs 才能真正存取
+vi.mock('@react-native-async-storage/async-storage', () => {
+  const m = new Map<string, string>();
+  return { default: { getItem: async (k: string) => m.get(k) ?? null, setItem: async (k: string, v: string) => void m.set(k, v) } };
+});
 import { spawn, execFile } from 'node:child_process';
 import type { Channel, ExecResult, SpawnOptions, Transport } from '../src/core/transport';
 import { LiveAgent } from '../src/core/live';
@@ -90,4 +96,56 @@ describe(`permission recovery on ${HOST}`, () => {
       await transport.exec(`D=${agentDirExpr(CWD.replace('~', '/home/rong'), AGENT_ID)}; kill "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; rm -rf "$D" /tmp/${marker}.txt; true`);
     }
   }, 400000);
+
+  it('saved mode (agent+project level) is applied when reopening an existing thread', async () => {
+    const AGENT_ID = 'perm-test-prefs';
+    const CMD = 'npx -y @agentclientprotocol/claude-agent-acp';
+    const CWD = '~/mobile-acp-toy';
+    const a1 = await LiveAgent.connect({ transport, cmd: CMD, cwd: CWD, agentId: AGENT_ID, persist: true });
+    const t1 = await a1.newThread();
+    await t1.setMode('default');
+    const sessionId = t1.sessionId;
+    a1.dispose();
+    const a2 = await LiveAgent.connect({ transport, cmd: CMD, cwd: CWD, agentId: AGENT_ID, persist: true });
+    try {
+      // 用户在别处把偏好改成 bypass，然后重开这个旧 thread
+      const t0 = await a2.newThread();
+      await t0.setMode('bypassPermissions');
+      const t2 = await a2.openThread(sessionId);
+      expect(t2.store.getState().currentModeId).toBe('bypassPermissions');
+    } finally {
+      a2.dispose();
+      await transport.exec(`D=${agentDirExpr('/home/rong/mobile-acp-toy', AGENT_ID)}; kill "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; rm -rf "$D"; true`);
+    }
+  }, 200000);
+
+  it('turn started on a dropped connection shows busy after reconnect, clears when it ends', async () => {
+    const AGENT_ID = 'perm-test-busy';
+    const CMD = 'npx -y @agentclientprotocol/claude-agent-acp';
+    const CWD = '~/mobile-acp-toy';
+    const marker = `BUSY-${Date.now()}`;
+    const a1 = await LiveAgent.connect({ transport, cmd: CMD, cwd: CWD, agentId: AGENT_ID, persist: true });
+    const t1 = await a1.newThread();
+    await t1.setMode('bypassPermissions');
+    const sessionId = t1.sessionId;
+    t1.send(`Use Bash to run exactly: for i in $(seq 1 30); do sleep 1; done; echo ${marker} — then reply with the marker.`).catch(() => {});
+    await new Promise((r) => setTimeout(r, 12000)); // 让 tool call 先出现
+    a1.dispose();
+    const a2 = await LiveAgent.connect({ transport, cmd: CMD, cwd: CWD, agentId: AGENT_ID, persist: true });
+    try {
+      const t2 = await a2.openThread(sessionId);
+      expect(t2.store.getState().busy).toBe(true); // 回放末尾 tool call 仍在跑
+      const t0 = Date.now();
+      while (t2.store.getState().busy) {
+        if (Date.now() - t0 > 90000) throw new Error('busy never cleared');
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      const texts = t2.store.getState().entries
+        .map((e) => ('text' in e ? e.text : e.type === 'tool_call' ? JSON.stringify(e.content) : '')).join('\n');
+      expect(texts).toContain(marker); // 结束前的实时输出已入列
+    } finally {
+      a2.dispose();
+      await transport.exec(`D=${agentDirExpr('/home/rong/mobile-acp-toy', AGENT_ID)}; kill "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; rm -rf "$D"; true`);
+    }
+  }, 300000);
 });

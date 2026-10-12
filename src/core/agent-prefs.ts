@@ -1,5 +1,5 @@
 // 每个 (agent, project) 记住用户选过的会话配置（mode/model/effort…），
-// 新开 thread 时自动恢复。历史 thread 用它自己存着的配置，不覆盖。
+// 新开/打开历史/重连的 thread 时都自动套用（偏好跟 agent+项目走，不跟 thread 走）。
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 

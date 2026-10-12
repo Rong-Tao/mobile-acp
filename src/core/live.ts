@@ -39,6 +39,11 @@ export interface LiveAgentOptions {
   env?: Record<string, string>;
 }
 
+/** 属于"turn 正在进行"的 session/update 类型（不含 mode/commands/usage 等元信息） */
+function isTurnActivity(kind: string): boolean {
+  return kind === 'agent_message_chunk' || kind === 'agent_thought_chunk' || kind === 'tool_call' || kind === 'tool_call_update' || kind === 'plan';
+}
+
 /** 一个 thread（ACP session）。UI 消费 store，操作走这里。 */
 export class LiveSession {
   constructor(
@@ -80,6 +85,10 @@ export class LiveSession {
     // 协议要求：取消时待决的 permission 必须以 cancelled outcome 回复
     this.store.getState().pendingPermission?.cancel();
     await this.owner.agent.cancel(this.sessionId);
+    // 孤儿 turn 若其实已不在跑（agent 重启过），不会再有 stopReason——别让 busy 永远挂着
+    if (!this.promptActive) {
+      setTimeout(() => { if (!this.promptActive) this.store.setBusy(false); }, 3000);
+    }
   }
 
   /** legacy mode 切换（没有 configOptions 的 agent）。turn 进行中也允许。 */
@@ -134,7 +143,13 @@ export class LiveAgent {
         // 多 thread：一切通知/请求按 sessionId 路由到对应 store
         onSessionUpdate: (n) => {
           opts.onActivity?.();
-          live.threads.get(n.sessionId)?.store.apply(n);
+          const t = live.threads.get(n.sessionId);
+          if (!t) return;
+          t.store.apply(n);
+          // 重连后接手的"孤儿 turn"：没有本连接的 prompt、却有实时活动流进来 → 在工作
+          if (!t.promptActive && !t.store.replaying && !t.store.getState().busy && isTurnActivity(n.update.sessionUpdate)) {
+            t.store.setBusy(true);
+          }
         },
         onPermissionRequest: (req) =>
           new Promise((resolve) => {
@@ -158,9 +173,12 @@ export class LiveAgent {
           }),
         onTurnEnd: () => {
           // 接手的孤儿 turn 结束（它的 prompt promise 在旧连接上，这里收不到）
-          for (const t of live.threads.values()) {
-            if (!t.promptActive && t.store.getState().busy) t.store.setBusy(false);
-          }
+          // 延后一拍：同一批数据里 stopReason 前的最后几条 update 还没被 SDK 派发完
+          setTimeout(() => {
+            for (const t of live.threads.values()) {
+              if (!t.promptActive && t.store.getState().busy) t.store.setBusy(false);
+            }
+          }, 400);
         },
         onStderr: (l) => console.warn('[agent stderr]', l),
         onAgentExit: (code) => console.warn('[agent] exited', code),
@@ -234,6 +252,14 @@ export class LiveAgent {
     } finally {
       store.replaying = false;
     }
+    // 回放结束时最后一个 tool call 还在 pending/in_progress → 上一条连接发起的 turn 仍在跑
+    const last = [...sess.store.getState().entries].reverse().find((e) => e.type === 'tool_call');
+    if (last && last.type === 'tool_call' && (last.status === 'pending' || last.status === 'in_progress')) {
+      sess.store.setBusy(true);
+    }
+    // mode/model/effort 是 (agent, project) 级偏好：历史/重连的 thread 同样套用，
+    // 否则 session/load 带回它存档时的 default，用户选过的 bypass 就"丢"了
+    await this.applySavedPrefs(sess);
     this.savePref({ lastThreadId: sessionId });
     if (this.opts.persist) await this.recoverPermissions(sess);
     return sess;
